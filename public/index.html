@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Oasis — Multiplayer Gaming Arena</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏝️</text></svg>">
+  <meta name="description" content="Oasis — Challenge players to real-money games. Win big!">
+  <meta name="theme-color" content="#1a0f0a">
+  <link rel="stylesheet" href="/css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- PRELOADER -->
+  <div id="preloader">
+    <div class="preloader-inner">
+      <div class="oasis-logo">🏝️</div>
+      <h1>OASIS</h1>
+      <p class="tagline">Multiplayer Gaming Arena</p>
+      <div class="loading-bar"><div class="loading-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- AUTH SCREEN -->
+  <div id="auth-screen" class="hidden">
+    <div class="auth-container">
+      <div class="auth-left">
+        <div class="auth-hero">
+          <div class="auth-logo">🏝️</div>
+          <h1>OASIS</h1>
+          <p class="auth-subtitle">MULTIPLAYER GAMING ARENA</p>
+          <p class="auth-tagline">Challenge players. Win real money.</p>
+          <div class="auth-games-preview">
+            <span>⭕</span><span>✊</span><span>🃏</span><span>🎲</span><span>🧠</span><span>🔢</span>
+          </div>
+          <div class="auth-features">
+            <div class="auth-feature"><span class="af-icon">⚡</span><span>Instant matchmaking</span></div>
+            <div class="auth-feature"><span class="af-icon">💰</span><span>Real money prizes</span></div>
+            <div class="auth-feature"><span class="af-icon">🏆</span><span>Skill-based competition</span></div>
+            <div class="auth-feature"><span class="af-icon">🔒</span><span>Secure banking</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="auth-right">
+        <!-- LOGIN -->
+        <div id="login-form" class="auth-form">
+          <h2>Enter the Arena</h2>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="login-email" placeholder="your@email.com">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="login-password" placeholder="Enter password">
+          </div>
+          <button class="btn-primary" id="login-btn">Log In</button>
+          <p class="auth-switch">New player? <a href="#" id="show-register">Create Account</a></p>
+          <p class="auth-admin-hint">Admin: admin@oasis.gg / admin123</p>
+        </div>
+        <!-- REGISTER -->
+        <div id="register-form" class="auth-form hidden">
+          <h2>Join the Arena</h2>
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" id="reg-name" placeholder="Your full name">
+          </div>
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="reg-username" placeholder="Choose a username">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="reg-email" placeholder="your@email.com">
+          </div>
+          <div class="form-group">
+            <label>Phone (optional)</label>
+            <input type="tel" id="reg-phone" placeholder="Your phone number">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="reg-password" placeholder="Create a password">
+          </div>
+          <div class="form-check">
+            <input type="checkbox" id="reg-terms">
+            <label for="reg-terms">I agree to the <a href="#" id="show-terms">Terms & Conditions</a> and confirm I am 18+</label>
+          </div>
+          <button class="btn-primary" id="register-btn">Create Account</button>
+          <p class="auth-switch">Already a player? <a href="#" id="show-login">Log In</a></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app-screen" class="hidden">
+
+    <!-- MOBILE HEADER -->
+    <header id="mobile-header">
+      <button id="menu-toggle" class="menu-btn">☰</button>
+      <h3>OASIS</h3>
+      <div class="header-right">
+        <span id="online-badge" class="online-badge">● 0</span>
+        <span id="header-balance" class="balance-badge">R 0</span>
+      </div>
+    </header>
+
+    <!-- SIDEBAR -->
+    <nav id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-logo">🏝️</div>
+        <h3>OASIS</h3>
+        <p class="sidebar-sub">Gaming Arena</p>
+      </div>
+      <div class="sidebar-user" id="sidebar-user">
+        <div class="su-avatar" id="su-avatar">?</div>
+        <div>
+          <p id="sidebar-username" class="su-name"></p>
+          <p id="sidebar-balance" class="su-balance">R 0.00</p>
+        </div>
+      </div>
+      <ul class="sidebar-nav">
+        <li><a href="#" class="nav-link active" data-section="lobby"><span class="nav-icon">🏠</span>Game Lobby</a></li>
+        <li><a href="#" class="nav-link" data-section="wallet"><span class="nav-icon">💰</span>Wallet</a></li>
+        <li><a href="#" class="nav-link" data-section="challenges"><span class="nav-icon">⚔️</span>Challenges <span id="challenges-badge" class="badge hidden">0</span></a></li>
+        <li><a href="#" class="nav-link" data-section="matches"><span class="nav-icon">📋</span>Match History</a></li>
+        <li><a href="#" class="nav-link" data-section="leaderboard"><span class="nav-icon">🏆</span>Leaderboard</a></li>
+        <li><a href="#" class="nav-link" data-section="profile"><span class="nav-icon">👤</span>Profile</a></li>
+        <li id="admin-nav-item" class="hidden"><a href="#" class="nav-link admin-nav" data-section="admin"><span class="nav-icon">⚙️</span>Admin Panel</a></li>
+      </ul>
+      <button id="logout-btn" class="btn-logout">Log Out</button>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main id="main-content">
+
+      <!-- LOBBY -->
+      <section id="section-lobby" class="section active">
+        <div class="section-header">
+          <h2>Game Lobby</h2>
+          <p class="section-sub">Choose a game and challenge players</p>
+        </div>
+        <div class="quickmatch-bar">
+          <h3>⚡ Quick Match</h3>
+          <p>Find an opponent instantly</p>
+        </div>
+        <div id="games-grid" class="games-grid"></div>
+
+        <div class="section-header" style="margin-top:2rem">
+          <h2>Online Players</h2>
+          <p class="section-sub" id="online-count">0 players online</p>
+        </div>
+        <div id="online-players" class="online-players"></div>
+      </section>
+
+      <!-- WALLET -->
+      <section id="section-wallet" class="section">
+        <div class="section-header">
+          <h2>💰 Wallet</h2>
+        </div>
+        <div class="wallet-balance-card">
+          <p class="wb-label">Available Balance</p>
+          <h1 id="wallet-balance" class="wb-amount">R 0.00</h1>
+          <div class="wb-actions">
+            <button class="btn-primary" id="btn-deposit">Deposit</button>
+            <button class="btn-secondary" id="btn-withdraw">Withdraw</button>
+          </div>
+        </div>
+        <div class="wallet-stats">
+          <div class="ws-stat"><span class="ws-label">Total Won</span><span id="ws-won" class="ws-value">R 0</span></div>
+          <div class="ws-stat"><span class="ws-label">Total Wagered</span><span id="ws-wagered" class="ws-value">R 0</span></div>
+          <div class="ws-stat"><span class="ws-label">Wins / Losses</span><span id="ws-record" class="ws-value">0 / 0</span></div>
+        </div>
+        <h3 style="color:var(--accent);margin:1.5rem 0 1rem">Banking Details</h3>
+        <div class="bank-form">
+          <div class="form-row">
+            <div class="form-group"><label>Bank</label><input type="text" id="bank-name" placeholder="e.g. Capitec"></div>
+            <div class="form-group"><label>Account Holder</label><input type="text" id="bank-holder" placeholder="Name on account"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label>Account Number</label><input type="text" id="bank-account" placeholder="Account number"></div>
+            <div class="form-group"><label>Branch Code</label><input type="text" id="bank-branch" placeholder="Branch code"></div>
+          </div>
+          <button class="btn-primary" id="save-bank-btn">Save Bank Details</button>
+        </div>
+        <h3 style="color:var(--accent);margin:1.5rem 0 1rem">Deposit to Play</h3>
+        <div class="bank-details-box">
+          <p><strong>Bank:</strong> Capitec Bank</p>
+          <p><strong>Account Name:</strong> The Lords Store House</p>
+          <p><strong>Account Number:</strong> 2570 590 386</p>
+          <p><strong>Branch Code:</strong> 470010</p>
+          <p><strong>Reference:</strong> Your username</p>
+        </div>
+        <div class="deposit-form" style="margin-top:1rem">
+          <div class="form-group"><label>Deposit Amount (R)</label><input type="number" id="deposit-amount" min="10" placeholder="Min R10"></div>
+          <div class="form-group"><label>Proof of Payment</label>
+            <div class="file-upload-area" id="deposit-proof-area">
+              <input type="file" id="deposit-proof" accept="image/*,.pdf" class="file-input">
+              <p>Click to upload bank screenshot</p>
+            </div>
+            <div id="proof-preview" class="proof-preview hidden"></div>
+          </div>
+          <button class="btn-primary" id="submit-deposit-btn">Submit Deposit</button>
+        </div>
+        <h3 style="color:var(--accent);margin:1.5rem 0 1rem">Recent Transactions</h3>
+        <div id="tx-list" class="tx-list"></div>
+      </section>
+
+      <!-- CHALLENGES -->
+      <section id="section-challenges" class="section">
+        <div class="section-header"><h2>⚔️ Challenges</h2></div>
+        <div class="challenge-tabs">
+          <button class="tab-btn active" data-tab="incoming">Incoming</button>
+          <button class="tab-btn" data-tab="outgoing">Outgoing</button>
+          <button class="tab-btn" data-tab="new">New Challenge</button>
+        </div>
+        <div id="tab-incoming" class="tab-content active"><div id="incoming-list" class="challenge-list"></div></div>
+        <div id="tab-outgoing" class="tab-content"><div id="outgoing-list" class="challenge-list"></div></div>
+        <div id="tab-new" class="tab-content">
+          <div class="new-challenge-form">
+            <div class="form-group"><label>Player Username</label><input type="text" id="challenge-username" placeholder="Enter opponent's username"></div>
+            <div class="form-group"><label>Game</label><select id="challenge-game"></select></div>
+            <div class="form-group"><label>Bet Amount (R)</label><input type="number" id="challenge-amount" min="10" placeholder="Min R10"></div>
+            <button class="btn-primary" id="send-challenge-btn">Send Challenge</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- MATCH HISTORY -->
+      <section id="section-matches" class="section">
+        <div class="section-header"><h2>📋 Match History</h2></div>
+        <div id="matches-list" class="matches-list"></div>
+      </section>
+
+      <!-- LEADERBOARD -->
+      <section id="section-leaderboard" class="section">
+        <div class="section-header"><h2>🏆 Leaderboard</h2></div>
+        <div id="leaderboard" class="leaderboard"></div>
+      </section>
+
+      <!-- PROFILE -->
+      <section id="section-profile" class="section">
+        <div class="section-header"><h2>👤 Profile</h2></div>
+        <div class="profile-card">
+          <div class="profile-avatar" id="profile-avatar">?</div>
+          <div class="profile-info">
+            <h3 id="profile-name"></h3>
+            <p id="profile-email"></p>
+            <p id="profile-joined"></p>
+          </div>
+        </div>
+        <div class="profile-stats">
+          <div class="ps-stat"><span class="ps-val" id="ps-wins">0</span><span class="ps-label">Wins</span></div>
+          <div class="ps-stat"><span class="ps-val" id="ps-losses">0</span><span class="ps-label">Losses</span></div>
+          <div class="ps-stat"><span class="ps-val" id="ps-earnings">R 0</span><span class="ps-label">Earnings</span></div>
+          <div class="ps-stat"><span class="ps-val" id="ps-wr">0%</span><span class="ps-label">Win Rate</span></div>
+        </div>
+      </section>
+
+      <!-- ADMIN -->
+      <section id="section-admin" class="section">
+        <div class="section-header"><h2>⚙️ Admin Panel</h2></div>
+        <div class="admin-stats" id="admin-stats"></div>
+        <div class="admin-tabs">
+          <button class="tab-btn active" data-tab="adm-deposits">Deposits</button>
+          <button class="tab-btn" data-tab="adm-withdrawals">Withdrawals</button>
+          <button class="tab-btn" data-tab="adm-users">Users</button>
+          <button class="tab-btn" data-tab="adm-matches">Matches</button>
+        </div>
+        <div id="tab-adm-deposits" class="tab-content active"><div id="adm-deposits-list"></div></div>
+        <div id="tab-adm-withdrawals" class="tab-content"><div id="adm-withdrawals-list"></div></div>
+        <div id="tab-adm-users" class="tab-content"><div id="adm-users-list"></div></div>
+        <div id="tab-adm-matches" class="tab-content"><div id="adm-matches-list"></div></div>
+      </section>
+
+      <!-- GAME ARENA -->
+      <section id="section-game" class="section">
+        <div id="game-arena"></div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
