@@ -1,0 +1,51 @@
+{
+  "users": [
+    {
+      "id": "b82b1b35-4969-4aeb-82fe-984e7c15ac25",
+      "username": "admin",
+      "email": "admin@oasis.gg",
+      "password": "$2a$10$r09A.zDs8vmj8V5ahl0bO.dvz1MvNjqx5xp4150O7K1u.bTIGrJ8O",
+      "fullName": "Oasis Admin",
+      "phone": "",
+      "role": "admin",
+      "balance": 0,
+      "wins": 0,
+      "losses": 0,
+      "totalEarnings": 0,
+      "totalSpent": 0,
+      "bankName": "",
+      "bankAccount": "",
+      "bankBranch": "",
+      "bankHolder": "",
+      "isVerified": true,
+      "isActive": true,
+      "joinedAt": "2026-07-19T12:39:43.434Z"
+    },
+    {
+      "id": "85a7c76d-f964-45f1-b16b-5d6494253346",
+      "username": "JAck Hammer",
+      "email": "jacobsrussell27@gmail.com",
+      "password": "$2a$10$/hyck00xfND7B9iLi0sgu.xztNLL/ZH.mM45QsM.kpx41QBCVRlP6",
+      "fullName": "russell Jacobs",
+      "phone": "+27 0624174270",
+      "role": "player",
+      "balance": 0,
+      "wins": 0,
+      "losses": 0,
+      "totalEarnings": 0,
+      "totalSpent": 0,
+      "bankName": "",
+      "bankAccount": "",
+      "bankBranch": "",
+      "bankHolder": "",
+      "isVerified": true,
+      "isActive": true,
+      "joinedAt": "2026-07-19T12:55:33.183Z"
+    }
+  ],
+  "matches": [],
+  "transactions": [],
+  "deposits": [],
+  "withdrawals": [],
+  "challenges": []
+}

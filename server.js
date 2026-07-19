@@ -6,6 +6,8 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const https = require('https');
+require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
@@ -46,9 +48,103 @@ function loadDB() {
   } catch (e) { console.error('DB load error:', e.message); }
 }
 function saveDB() {
-  try { fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2)); } catch (e) { console.error('DB save error:', e.message); }
+  try {
+    fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+    syncDBToGitHub(db);
+  } catch (e) { console.error('DB save error:', e.message); }
 }
-loadDB();
+
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
+const GITHUB_REPO = process.env.GITHUB_REPO || 'jacobsrussell/oasis-game';
+const GITHUB_DB_PATH = process.env.GITHUB_DB_PATH || 'data/db.json';
+
+function syncDBToGitHub(data) {
+  if (!GITHUB_TOKEN) return;
+  try {
+    const content = Buffer.from(JSON.stringify(data, null, 2)).toString('base64');
+    const getReq = https.request({
+      hostname: 'api.github.com',
+      path: `/repos/${GITHUB_REPO}/contents/${GITHUB_DB_PATH}`,
+      method: 'GET',
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'oasis-server', 'Accept': 'application/vnd.github+json' }
+    }, (res) => {
+      let body = '';
+      res.on('data', c => body += c);
+      res.on('end', () => {
+        try {
+          const existing = JSON.parse(body);
+          const sha = existing.sha;
+          const putData = JSON.stringify({ message: 'Auto-sync db.json', content, sha, branch: 'master' });
+          const putReq = https.request({
+            hostname: 'api.github.com',
+            path: `/repos/${GITHUB_REPO}/contents/${GITHUB_DB_PATH}`,
+            method: 'PUT',
+            headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'oasis-server', 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(putData) }
+          }, (putRes) => {
+            let putBody = '';
+            putRes.on('data', c => putBody += c);
+            putRes.on('end', () => {
+              if (putRes.statusCode === 200 || putRes.statusCode === 201) {
+                console.log('DB synced to GitHub successfully');
+              } else {
+                console.error('GitHub sync failed:', putRes.statusCode, putBody.substring(0, 200));
+              }
+            });
+          });
+          putReq.on('error', (e) => console.error('GitHub sync PUT error:', e.message));
+          putReq.write(putData);
+          putReq.end();
+        } catch (e) {
+          console.error('GitHub sync parse error:', e.message);
+        }
+      });
+    });
+    getReq.on('error', (e) => console.error('GitHub sync GET error:', e.message));
+    getReq.end();
+  } catch (e) {
+    console.error('GitHub sync error:', e.message);
+  }
+}
+
+async function loadDBFromGitHub() {
+  if (!GITHUB_TOKEN) return null;
+  return new Promise((resolve) => {
+    const req = https.request({
+      hostname: 'api.github.com',
+      path: `/repos/${GITHUB_REPO}/contents/${GITHUB_DB_PATH}`,
+      method: 'GET',
+      headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'User-Agent': 'oasis-server', 'Accept': 'application/vnd.github+json' }
+    }, (res) => {
+      let body = '';
+      res.on('data', c => body += c);
+      res.on('end', () => {
+        try {
+          if (res.statusCode !== 200) return resolve(null);
+          const data = JSON.parse(body);
+          const content = Buffer.from(data.content, 'base64').toString('utf8');
+          resolve(JSON.parse(content));
+        } catch { resolve(null); }
+      });
+    });
+    req.on('error', () => resolve(null));
+    req.setTimeout(10000, () => { req.destroy(); resolve(null); });
+    req.end();
+  });
+}
+
+async function initDB() {
+  loadDB();
+  if (db.users.length === 0 && GITHUB_TOKEN) {
+    console.log('Local DB empty, loading from GitHub...');
+    const remoteDB = await loadDBFromGitHub();
+    if (remoteDB && remoteDB.users && remoteDB.users.length > 0) {
+      console.log(`Loaded ${remoteDB.users.length} users from GitHub`);
+      db = remoteDB;
+      fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+    }
+  }
+}
+initDB();
 
 function findUser(query) {
   if (query.id) return db.users.find(u => u.id === query.id);
