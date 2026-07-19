@@ -270,17 +270,17 @@ app.post('/api/withdraw', authMiddleware, (req, res) => {
 
 // ===================== GAMES =====================
 const GAMES = [
-  { id: 'flappy-bird', name: 'Flappy Bird', icon: '🐦', minBet: 10, maxBet: 5000, players: 2, desc: 'Tap to flap and dodge pipes! Highest score wins!' },
-  { id: '2048', name: '2048', icon: '🔢', minBet: 10, maxBet: 5000, players: 2, desc: 'Slide tiles to merge numbers. Reach the highest tile!' },
-  { id: 'snake', name: 'Snake', icon: '🐍', minBet: 10, maxBet: 5000, players: 2, desc: 'Eat, grow, survive! Longest snake wins!' },
-  { id: 'connect-4', name: 'Connect 4', icon: '🔴', minBet: 10, maxBet: 5000, players: 2, desc: 'Drop discs to get 4 in a row. Classic strategy!' },
-  { id: 'breakout', name: 'Breakout', icon: '🧱', minBet: 10, maxBet: 5000, players: 2, desc: 'Smash bricks with your ball! Most bricks broken wins!' },
-  { id: 'space-invaders', name: 'Space Invaders', icon: '👾', minBet: 10, maxBet: 5000, players: 2, desc: 'Defend Earth! Highest alien score wins!' },
-  { id: 'whack-a-mole', name: 'Whack-a-Mole', icon: '🔨', minBet: 10, maxBet: 5000, players: 2, desc: 'Quick! Whack the moles! Most hits in 30s wins!' },
-  { id: 'minesweeper', name: 'Minesweeper', icon: '💣', minBet: 10, maxBet: 5000, players: 2, desc: 'Clear the minefield! Most safe cells cleared wins!' },
-  { id: 'tetris', name: 'Tetris', icon: '📦', minBet: 10, maxBet: 5000, players: 2, desc: 'Clear lines! Most lines cleared wins!' },
-  { id: 'bubble-shooter', name: 'Bubble Shooter', icon: '🫧', minBet: 10, maxBet: 5000, players: 2, desc: 'Match and pop bubbles! Highest score wins!' },
-  { id: 'doodle-jump', name: 'Doodle Jump', icon: '📈', minBet: 10, maxBet: 5000, players: 2, desc: 'Jump higher and higher! Highest altitude wins!' }
+  { id: 'pac-man', name: 'Pac-Man', icon: '🟡', minBet: 10, maxBet: 5000, players: 2, desc: 'Navigate the maze, eat all dots, avoid ghosts! Highest score wins!' },
+  { id: 'frogger', name: 'Frogger', icon: '🐸', minBet: 10, maxBet: 5000, players: 2, desc: 'Cross roads and rivers, dodge traffic! Most crossings wins!' },
+  { id: 'asteroids', name: 'Asteroids', icon: '☄️', minBet: 10, maxBet: 5000, players: 2, desc: 'Warp through space, blast asteroids! Highest score wins!' },
+  { id: 'galaga', name: 'Galaga', icon: '🚀', minBet: 10, maxBet: 5000, players: 2, desc: 'Dodge enemy formations and shoot! Highest alien score wins!' },
+  { id: 'centipede', name: 'Centipede', icon: '🐛', minBet: 10, maxBet: 5000, players: 2, desc: 'Shoot the centipede before it reaches you! Highest score wins!' },
+  { id: 'defender', name: 'Defender', icon: '🛸', minBet: 10, maxBet: 5000, players: 2, desc: 'Protect humans from alien abduction! Highest score wins!' },
+  { id: 'tetris', name: 'Tetris', icon: '📦', minBet: 10, maxBet: 5000, players: 2, desc: 'Stack blocks and clear lines! Most lines cleared wins!' },
+  { id: 'arkanoid', name: 'Arkanoid', icon: '🧱', minBet: 10, maxBet: 5000, players: 2, desc: 'Break every brick with power-ups! Highest score wins!' },
+  { id: 'helicopter', name: 'Helicopter', icon: '🚁', minBet: 10, maxBet: 5000, players: 2, desc: 'Fly through endless caves! Longest distance wins!' },
+  { id: 'geometry-dash', name: 'Geometry Dash', icon: '🔷', minBet: 10, maxBet: 5000, players: 2, desc: 'Jump and fly through obstacles! Highest progress wins!' },
+  { id: 'crossy-road', name: 'Crossy Road', icon: '🐔', minBet: 10, maxBet: 5000, players: 2, desc: 'Hop across roads and rivers! Farthest distance wins!' }
 ];
 
 app.get('/api/games', authMiddleware, (req, res) => res.json({ games: GAMES }));
@@ -661,12 +661,6 @@ wss.on('connection', (ws, req) => {
         handleGameScore(room, userId, msg);
       }
 
-      if (msg.type === 'game_c4') {
-        const room = activeRooms[msg.roomId];
-        if (!room || !room.players.includes(userId)) return;
-        handleConnect4(room, userId, msg);
-      }
-
       if (msg.type === 'chat') {
         const user = findUser({ id: userId });
         wss.clients.forEach(client => {
@@ -721,109 +715,20 @@ function handleGameScore(room, userId, msg) {
   }
 }
 
-function handleConnect4(room, userId, msg) {
-  if (!room.c4Board) {
-    room.c4Board = Array(6).fill(null).map(() => Array(7).fill(0));
-    room.c4Turn = 0;
-  }
-  if (room.freePlay && room.c4Turn % 2 === 1) {
-    const col = botC4Move(room);
-    if (col === undefined) return;
-    let row = 5;
-    while (row >= 0 && room.c4Board[row][col] !== 0) row--;
-    room.c4Board[row][col] = 2;
-    room.c4Turn++;
-    const win = checkC4Win(room.c4Board, 2);
-    broadcastToUser(userId, { type: 'c4_update', board: room.c4Board, lastMove: { row, col, mark: 2 }, yourTurn: true, win: !!win });
-    if (win) endMatch(room, BOT_ID);
-    else if (room.c4Turn >= 42) endMatch(room, null);
-    return;
-  }
-
-  const pIdx = room.players.indexOf(userId);
-  if (room.c4Turn % 2 !== pIdx) return;
-  const col = msg.col;
-  if (col === undefined || col < 0 || col > 6 || room.c4Board[0][col] !== 0) return;
-
-  let row = 5;
-  while (row >= 0 && room.c4Board[row][col] !== 0) row--;
-  const mark = pIdx + 1;
-  room.c4Board[row][col] = mark;
-  room.c4Turn++;
-
-  const win = checkC4Win(room.c4Board, mark);
-  broadcastToUser(userId, { type: 'c4_update', board: room.c4Board, lastMove: { row, col, mark }, yourTurn: false, win: !!win });
-
-  if (room.freePlay) {
-    setTimeout(() => {
-      if (room.c4Board && room.c4Turn % 2 === 1 && !win) {
-        const bc = botC4Move(room);
-        if (bc !== undefined) {
-          let br = 5;
-          while (br >= 0 && room.c4Board[br][bc] !== 0) br--;
-          room.c4Board[br][bc] = 2;
-          room.c4Turn++;
-          const bwin = checkC4Win(room.c4Board, 2);
-          broadcastToUser(userId, { type: 'c4_update', board: room.c4Board, lastMove: { row: br, col: bc, mark: 2 }, yourTurn: true, win: !!bwin });
-          if (bwin) endMatch(room, BOT_ID);
-          else if (room.c4Turn >= 42) endMatch(room, null);
-        }
-      }
-    }, 800);
-  } else {
-    const opp = room.players.find(p => p !== userId);
-    broadcastToUser(opp, { type: 'c4_update', board: room.c4Board, lastMove: { row, col, mark }, yourTurn: true, win: !!win });
-    if (win) endMatch(room, userId);
-    else if (room.c4Turn >= 42) endMatch(room, null);
-  }
-}
-
-function checkC4Win(board, mark) {
-  for (let r = 0; r < 6; r++) {
-    for (let c = 0; c < 7; c++) {
-      if (board[r][c] !== mark) continue;
-      if (c + 3 < 7 && board[r][c+1] === mark && board[r][c+2] === mark && board[r][c+3] === mark) return true;
-      if (r + 3 < 6 && board[r+1][c] === mark && board[r+2][c] === mark && board[r+3][c] === mark) return true;
-      if (r + 3 < 6 && c + 3 < 7 && board[r+1][c+1] === mark && board[r+2][c+2] === mark && board[r+3][c+3] === mark) return true;
-      if (r + 3 < 6 && c - 3 >= 0 && board[r+1][c-1] === mark && board[r+2][c-2] === mark && board[r+3][c-3] === mark) return true;
-    }
-  }
-  return false;
-}
-
-function botC4Move(room) {
-  const valid = [];
-  for (let c = 0; c < 7; c++) if (room.c4Board[0][c] === 0) valid.push(c);
-  if (!valid.length) return undefined;
-
-  for (const c of valid) {
-    let r = 5; while (r >= 0 && room.c4Board[r][c] !== 0) r--;
-    room.c4Board[r][c] = 2;
-    if (checkC4Win(room.c4Board, 2)) { room.c4Board[r][c] = 0; return c; }
-    room.c4Board[r][c] = 0;
-  }
-  for (const c of valid) {
-    let r = 5; while (r >= 0 && room.c4Board[r][c] !== 0) r--;
-    room.c4Board[r][c] = 1;
-    if (checkC4Win(room.c4Board, 1)) { room.c4Board[r][c] = 0; return c; }
-    room.c4Board[r][c] = 0;
-  }
-  return valid[Math.floor(Math.random() * valid.length)];
-}
-
 function generateBotScore(gameId) {
   const r = Math.random;
   switch (gameId) {
-    case 'flappy-bird': return Math.floor(r() * 20) + 5;
-    case '2048': return [256, 512, 1024, 1024, 2048][Math.floor(r() * 5)];
-    case 'snake': return Math.floor(r() * 20) + 5;
-    case 'breakout': return Math.floor(r() * 400) + 150;
-    case 'space-invaders': return Math.floor(r() * 2000) + 500;
-    case 'whack-a-mole': return Math.floor(r() * 15) + 5;
-    case 'minesweeper': return Math.floor(r() * 30) + 10;
-    case 'tetris': return Math.floor(r() * 20) + 3;
-    case 'bubble-shooter': return Math.floor(r() * 3000) + 500;
-    case 'doodle-jump': return Math.floor(r() * 5000) + 1000;
+    case 'pac-man': return Math.floor(r() * 8000) + 2000;
+    case 'frogger': return Math.floor(r() * 25) + 8;
+    case 'asteroids': return Math.floor(r() * 6000) + 1500;
+    case 'galaga': return Math.floor(r() * 12000) + 3000;
+    case 'centipede': return Math.floor(r() * 10000) + 2000;
+    case 'defender': return Math.floor(r() * 15000) + 4000;
+    case 'tetris': return Math.floor(r() * 30) + 5;
+    case 'arkanoid': return Math.floor(r() * 5000) + 1000;
+    case 'helicopter': return Math.floor(r() * 800) + 200;
+    case 'geometry-dash': return Math.floor(r() * 5000) + 1000;
+    case 'crossy-road': return Math.floor(r() * 40) + 10;
     default: return Math.floor(r() * 100);
   }
 }
