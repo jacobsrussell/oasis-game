@@ -165,7 +165,11 @@
         break;
 
       case 'match_found':
-        showToast(`⚡ Match found! vs ${msg.opponent} for R${msg.pot}`, 'success');
+        if (msg.freePlay) {
+          showToast(`🎮 Free Play vs ${msg.opponent}! No money at stake.`, 'success');
+        } else {
+          showToast(`⚡ Match found! vs ${msg.opponent} for R${msg.pot}`, 'success');
+        }
         currentRoom = msg.roomId;
         currentGame = msg.game;
         startGame(msg.game, msg.roomId, msg.pot, msg.opponent);
@@ -189,9 +193,16 @@
       case 'block_penalty': handleBlockPenalty(msg); break;
 
       case 'match_over':
-        if (msg.won === true) showToast(`🏆 You won R${msg.amount}!`, 'success');
-        else if (msg.won === false) showToast(`💔 You lost. Better luck next time!`, 'error');
-        else showToast(`🤝 Draw! R${msg.amount} refunded.`, '');
+        if (msg.freePlay) {
+          if (msg.won === true) showToast(`🏆 You beat the Bot! Nice win!`, 'success');
+          else if (msg.won === false) showToast(`💀 Bot wins this round! Try again!`, 'error');
+          else showToast(`🤝 Draw! Well played!`, '');
+        } else {
+          if (msg.won === true) showToast(`🏆 You won R${msg.amount}!`, 'success');
+          else if (msg.won === false) showToast(`💔 You lost. Better luck next time!`, 'error');
+          else showToast(`🤝 Draw! R${msg.amount} refunded.`, '');
+        }
+        currentRoom = null;
         setTimeout(() => { navigate('lobby'); loadWallet(); }, 2000);
         break;
 
@@ -222,10 +233,19 @@
           <span class="gc-bet">R${g.minBet} - R${g.maxBet.toLocaleString()}</span>
           <span>${g.players} players</span>
         </div>
-        <button class="gc-play" onclick="window.oasisPlay('${g.id}')">PLAY NOW</button>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <button class="gc-play" onclick="window.oasisFreePlay('${g.id}')">🎮 FREE PLAY</button>
+          <button class="gc-play" onclick="window.oasisPlay('${g.id}')" style="background:var(--accent);color:#000">💰 BET & PLAY</button>
+        </div>
       </div>
     `).join('');
   }
+
+  window.oasisFreePlay = async (gameId) => {
+    const d = await api('/api/freeplay', { method: 'POST', body: JSON.stringify({ gameId }) });
+    if (d.error) return showToast(d.error, 'error');
+    window._freePlayMode = true;
+  };
 
   window.oasisPlay = (gameId) => {
     const game = GAMES.find(g => g.id === gameId);
@@ -290,16 +310,18 @@
   function startGame(gameId, roomId, pot, opponent) {
     navigate('game');
     const arena = $('#game-arena');
+    const isFreePlay = window._freePlayMode;
     arena.innerHTML = `
       <div style="width:100%;max-width:600px;margin:0 auto">
         <div class="game-header">
           <h2>${GAMES.find(g => g.id === gameId)?.icon || '🎮'} ${GAMES.find(g => g.id === gameId)?.name || gameId}</h2>
-          <div class="pot">Pot: R${pot}</div>
+          <div class="pot">${isFreePlay ? '🎮 Free Play' : 'Pot: R' + pot}</div>
           <div class="opponent">vs ${opponent}</div>
         </div>
         <div id="game-area"></div>
       </div>
     `;
+    window._freePlayMode = false;
 
     switch (gameId) {
       case 'tic-tac-toe': initTTT(); break;

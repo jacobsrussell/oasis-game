@@ -413,6 +413,108 @@ app.post('/api/cancel-match', authMiddleware, (req, res) => {
   res.json({ success: true });
 });
 
+const BOT_ID = 'oasis-bot-ai';
+const BOT_USER = { id: BOT_ID, username: 'Oasis Bot', balance: 0, wins: 0, totalEarnings: 0, role: 'player' };
+
+app.post('/api/freeplay', authMiddleware, (req, res) => {
+  const { gameId } = req.body;
+  const game = GAMES.find(g => g.id === gameId);
+  if (!game) return res.status(400).json({ error: 'Invalid game' });
+
+  const roomId = uuidv4();
+  const room = {
+    id: roomId, gameId, pot: 0,
+    players: [req.user.id, BOT_ID], moves: {}, scores: {},
+    status: 'playing', freePlay: true, startedAt: new Date().toISOString()
+  };
+  activeRooms[roomId] = room;
+
+  broadcastToUser(req.user.id, { type: 'match_found', roomId, game: gameId, pot: 0, opponent: 'Oasis Bot', freePlay: true });
+  res.json({ matched: true, roomId, pot: 0, opponent: 'Oasis Bot', freePlay: true });
+});
+
+function botMove(room) {
+  const gameId = room.gameId;
+  const botId = BOT_ID;
+  const userId = room.players[0];
+  const delay = 600 + Math.random() * 1000;
+
+  setTimeout(() => {
+    switch (gameId) {
+      case 'rps': {
+        const moves = ['rock', 'paper', 'scissors'];
+        processGameMove(room, botId, userId, { type: 'game_move', move: moves[Math.floor(Math.random() * 3)] });
+        break;
+      }
+      case 'tic-tac-toe': {
+        if (!room.board) { processGameMove(room, botId, userId, { type: 'game_move' }); return; }
+        const empty = room.board.map((v, i) => v === null ? i : -1).filter(i => i >= 0);
+        if (empty.length === 0) return;
+        const botMark = room.turn % 2 === 0 ? 'X' : 'O';
+        const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+        let bestCell = empty[Math.floor(Math.random() * empty.length)];
+        for (const [a,b,c] of lines) {
+          const vals = [room.board[a], room.board[b], room.board[c]];
+          if (vals.filter(v => v === botMark).length === 2 && vals.includes(null)) {
+            bestCell = [a,b,c][vals.indexOf(null)];
+          }
+          const oppMark = botMark === 'X' ? 'O' : 'X';
+          if (vals.filter(v => v === oppMark).length === 2 && vals.includes(null)) {
+            bestCell = [a,b,c][vals.indexOf(null)];
+          }
+        }
+        processGameMove(room, botId, userId, { type: 'game_move', cell: bestCell });
+        break;
+      }
+      case 'higher-lower': {
+        processGameMove(room, botId, userId, { type: 'game_move', guess: Math.random() > 0.5 ? 'higher' : 'lower' });
+        break;
+      }
+      case 'dice-duel': {
+        processGameMove(room, botId, userId, { type: 'game_move' });
+        break;
+      }
+      case 'memory-match': {
+        const unrevealed = [];
+        if (room.memCards) {
+          for (let i = 0; i < 16; i++) {
+            if (!room.memRevealed[i] && !room.memFlipped?.some(f => f.idx === i)) unrevealed.push(i);
+          }
+        }
+        const idx = unrevealed.length > 0 ? unrevealed[Math.floor(Math.random() * unrevealed.length)] : Math.floor(Math.random() * 16);
+        processGameMove(room, botId, userId, { type: 'game_move', index: idx });
+        break;
+      }
+      case 'math-rush': {
+        if (room.mathQ) {
+          const correct = Math.random() > 0.35;
+          const ans = correct ? room.mathQ.answer : room.mathQ.answer + Math.floor(Math.random() * 10) - 5;
+          processGameMove(room, botId, userId, { type: 'game_move', answer: ans });
+        }
+        break;
+      }
+      case 'street-racer': {
+        const actions = ['boost', 'drift', 'slipstream', 'ram'];
+        processGameMove(room, botId, userId, { type: 'game_move', action: actions[Math.floor(Math.random() * 4)] });
+        break;
+      }
+      case 'boxing-ring': {
+        const punches = ['jab', 'hook', 'uppercut', 'block', 'dodge'];
+        processGameMove(room, botId, userId, { type: 'game_move', punch: punches[Math.floor(Math.random() * 5)] });
+        break;
+      }
+      case 'street-fighter': {
+        const moves = ['punch', 'kick', 'block', 'heal'];
+        const botState = room.sfState?.[botId];
+        if (botState && botState.energy >= 30 && Math.random() > 0.6) moves.push('fireball');
+        if (botState && botState.energy >= 40 && Math.random() > 0.7) moves.push('shoryuken');
+        processGameMove(room, botId, userId, { type: 'game_move', move: moves[Math.floor(Math.random() * moves.length)] });
+        break;
+      }
+    }
+  }, delay);
+}
+
 let matchQueue = [];
 let activeRooms = {};
 
@@ -622,6 +724,12 @@ function processGameMove(room, userId, msg) {
     case 'block-puzzle':
       handleBlockPuzzle(room, userId, oppId, msg);
       break;
+  }
+
+  if (room.freePlay && room.status === 'playing' && userId !== BOT_ID && room.players.includes(BOT_ID) && !room._botPending && room.gameId !== 'tetris-clash' && room.gameId !== 'block-puzzle') {
+    room._botPending = true;
+    setTimeout(() => { room._botPending = false; }, 300);
+    botMove(room);
   }
 }
 
@@ -1016,6 +1124,13 @@ function endMatch(room, winnerId) {
     pot: room.pot, winnerId, date: new Date().toISOString()
   };
   db.matches.push(match);
+
+  if (room.freePlay) {
+    broadcastToUser(room.players[0], { type: 'match_over', roomId: room.id, won: winnerId === room.players[0], amount: 0, freePlay: true });
+    saveDB();
+    delete activeRooms[room.id];
+    return;
+  }
 
   if (winnerId) {
     const winner = findUser({ id: winnerId });
