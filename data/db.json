@@ -64,7 +64,19 @@
       "joinedAt": "2026-07-19T16:10:40.588Z"
     }
   ],
-  "matches": [],
+  "matches": [
+    {
+      "id": "8abf8dd0-7f66-4476-a951-f4c275a3242f",
+      "gameId": "street-fighter",
+      "players": [
+        "73876379-1a48-4d74-8d3d-47ae2ee4e5db",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "73876379-1a48-4d74-8d3d-47ae2ee4e5db",
+      "date": "2026-07-19T16:11:26.764Z"
+    }
+  ],
   "transactions": [],
   "deposits": [],
   "withdrawals": [],
