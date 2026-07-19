@@ -179,7 +179,12 @@ const GAMES = [
   { id: 'higher-lower', name: 'Higher or Lower', icon: '🃏', minBet: 10, maxBet: 10000, players: 2, desc: 'Guess if the next card is higher or lower. Most correct wins.' },
   { id: 'dice-duel', name: 'Dice Duel', icon: '🎲', minBet: 10, maxBet: 5000, players: 2, desc: 'Roll the dice. Highest total after 3 rolls wins!' },
   { id: 'memory-match', name: 'Memory Match', icon: '🧠', minBet: 10, maxBet: 5000, players: 2, desc: 'Find matching pairs. Most pairs found wins!' },
-  { id: 'math-rush', name: 'Math Rush', icon: '🔢', minBet: 10, maxBet: 5000, players: 2, desc: 'Solve math problems fastest. Most correct answers wins!' }
+  { id: 'math-rush', name: 'Math Rush', icon: '🔢', minBet: 10, maxBet: 5000, players: 2, desc: 'Solve math problems fastest. Most correct answers wins!' },
+  { id: 'street-racer', name: 'Street Racer', icon: '🏎️', minBet: 10, maxBet: 10000, players: 2, desc: 'High-speed street racing! Dodge traffic and outpace your rival to the finish line.' },
+  { id: 'boxing-ring', name: 'Boxing Ring', icon: '🥊', minBet: 10, maxBet: 10000, players: 2, desc: 'Step into the ring! Jab, hook, and uppercut your way to victory. Knockout wins the pot!' },
+  { id: 'street-fighter', name: 'Street Fighter', icon: '🐉', minBet: 10, maxBet: 10000, players: 2, desc: 'Choose your fighter and battle! Execute combos and special moves to defeat your opponent.' },
+  { id: 'tetris-clash', name: 'Tetris Clash', icon: '🧱', minBet: 10, maxBet: 5000, players: 2, desc: 'Race to clear lines! Send garbage blocks to your opponent. Last one standing wins!' },
+  { id: 'block-puzzle', name: 'Block Puzzle', icon: '🟦', minBet: 10, maxBet: 5000, players: 2, desc: 'Fit blocks on the board and clear rows. Most points wins the showdown!' }
 ];
 
 app.get('/api/games', authMiddleware, (req, res) => res.json({ games: GAMES }));
@@ -506,6 +511,21 @@ function processGameMove(room, userId, msg) {
     case 'math-rush':
       handleMathRush(room, userId, oppId, msg);
       break;
+    case 'street-racer':
+      handleStreetRacer(room, userId, oppId, msg);
+      break;
+    case 'boxing-ring':
+      handleBoxing(room, userId, oppId, msg);
+      break;
+    case 'street-fighter':
+      handleStreetFighter(room, userId, oppId, msg);
+      break;
+    case 'tetris-clash':
+      handleTetrisClash(room, userId, oppId, msg);
+      break;
+    case 'block-puzzle':
+      handleBlockPuzzle(room, userId, oppId, msg);
+      break;
   }
 }
 
@@ -699,6 +719,197 @@ function handleMathRush(room, userId, oppId, msg) {
       broadcastToUser(p1, { type: 'math_new', roomId: room.id, question: room.mathQ.text });
       broadcastToUser(p2, { type: 'math_new', roomId: room.id, question: room.mathQ.text });
     }
+  }
+}
+
+// ===================== STREET RACER =====================
+function handleStreetRacer(room, userId, oppId, msg) {
+  if (!room.racerState) {
+    room.racerState = { [room.players[0]]: { pos: 0, hp: 100 }, [room.players[1]]: { pos: 0, hp: 100 } };
+    room.racerTurn = 0;
+    room.racerRound = 0;
+  }
+  if (room.players[room.racerTurn % 2] !== userId) return;
+
+  const action = msg.action;
+  const state = room.racerState;
+  const oppState = room.racerState[oppId];
+
+  let speed = 0, dmg = 0;
+  switch (action) {
+    case 'boost': speed = Math.floor(Math.random() * 30) + 20; dmg = 0; break;
+    case 'drift': speed = Math.floor(Math.random() * 15) + 10; dmg = 15; break;
+    case 'slipstream': speed = Math.floor(Math.random() * 25) + 15; dmg = 10; break;
+    case 'ram': speed = 10; dmg = 25; break;
+    default: speed = Math.floor(Math.random() * 10) + 5;
+  }
+
+  state[userId].pos += speed;
+  state[userId].hp = Math.max(0, state[userId].hp - Math.floor(Math.random() * 10));
+  oppState.hp = Math.max(0, oppState.hp - dmg);
+  room.racerTurn++;
+  room.racerRound++;
+
+  const finished = state[userId].pos >= 500 || oppState.hp <= 0 || state[userId].hp <= 0 || room.racerRound >= 20;
+  broadcastToUser(userId, { type: 'racer_update', roomId: room.id, playerId: userId, action, speed, dmg, state: JSON.parse(JSON.stringify(state)), finished });
+  broadcastToUser(oppId, { type: 'racer_update', roomId: room.id, playerId: userId, action, speed, dmg, state: JSON.parse(JSON.stringify(state)), finished });
+
+  if (finished) {
+    const p1 = room.players[0], p2 = room.players[1];
+    const s1 = state[p1].pos, s2 = state[p2].pos;
+    const w = s1 > s2 ? p1 : s2 > s1 ? p2 : null;
+    endMatch(room, w);
+  }
+}
+
+// ===================== BOXING =====================
+function handleBoxing(room, userId, oppId, msg) {
+  if (!room.boxState) {
+    room.boxState = { [room.players[0]]: { hp: 100, stamina: 100 }, [room.players[1]]: { hp: 100, stamina: 100 } };
+    room.boxTurn = 0;
+    room.boxRound = 0;
+  }
+  if (room.players[room.boxTurn % 2] !== userId) return;
+
+  const punch = msg.punch;
+  const state = room.boxState;
+  const myState = state[userId];
+  const oppSt = state[oppId];
+
+  let dmg = 0, stamCost = 0;
+  switch (punch) {
+    case 'jab': dmg = Math.floor(Math.random() * 8) + 5; stamCost = 5; break;
+    case 'hook': dmg = Math.floor(Math.random() * 15) + 10; stamCost = 15; break;
+    case 'uppercut': dmg = Math.floor(Math.random() * 20) + 15; stamCost = 25; break;
+    case 'block': dmg = 0; stamCost = 3; myState.stamina = Math.min(100, myState.stamina + 8); break;
+    case 'dodge': dmg = 0; stamCost = 8; break;
+    default: dmg = Math.floor(Math.random() * 5); stamCost = 5;
+  }
+
+  if (punch !== 'block' && punch !== 'dodge' && myState.stamina < stamCost) {
+    dmg = Math.floor(dmg * 0.3);
+    stamCost = 2;
+  }
+  myState.stamina = Math.max(0, myState.stamina - stamCost);
+  oppSt.hp = Math.max(0, oppSt.hp - dmg);
+  myState.stamina = Math.min(100, myState.stamina + 3);
+  room.boxTurn++;
+  room.boxRound++;
+
+  const ko = oppSt.hp <= 0 || room.boxRound >= 12;
+  broadcastToUser(userId, { type: 'box_update', roomId: room.id, playerId: userId, punch, dmg, state: JSON.parse(JSON.stringify(state)), ko });
+  broadcastToUser(oppId, { type: 'box_update', roomId: room.id, playerId: userId, punch, dmg, state: JSON.parse(JSON.stringify(state)), ko });
+
+  if (ko) {
+    const p1 = room.players[0], p2 = room.players[1];
+    const w = state[p1].hp > state[p2].hp ? p1 : state[p2].hp > state[p1].hp ? p2 : null;
+    endMatch(room, w);
+  }
+}
+
+// ===================== STREET FIGHTER =====================
+function handleStreetFighter(room, userId, oppId, msg) {
+  if (!room.sfState) {
+    room.sfState = { [room.players[0]]: { hp: 100, energy: 50, fighter: 'dragon' }, [room.players[1]]: { hp: 100, energy: 50, fighter: 'phoenix' } };
+    room.sfTurn = 0;
+  }
+  if (room.players[room.sfTurn % 2] !== userId) return;
+
+  const move = msg.move;
+  const myState = room.sfState[userId];
+  const oppSt = room.sfState[oppId];
+
+  let dmg = 0, energyGain = 5;
+  switch (move) {
+    case 'punch': dmg = Math.floor(Math.random() * 8) + 4; energyGain = 8; break;
+    case 'kick': dmg = Math.floor(Math.random() * 12) + 8; energyGain = 5; break;
+    case 'fireball': dmg = myState.energy >= 30 ? Math.floor(Math.random() * 20) + 15 : 3; myState.energy -= myState.energy >= 30 ? 30 : 0; energyGain = 0; break;
+    case 'shoryuken': dmg = myState.energy >= 40 ? Math.floor(Math.random() * 25) + 20 : 5; myState.energy -= myState.energy >= 40 ? 40 : 0; energyGain = 0; break;
+    case 'block': dmg = 0; energyGain = 12; break;
+    case 'heal': dmg = 0; myState.hp = Math.min(100, myState.hp + 10); energyGain = -5; break;
+    default: dmg = 4; energyGain = 5;
+  }
+
+  myState.energy = Math.min(100, Math.max(0, myState.energy + energyGain));
+  oppSt.hp = Math.max(0, oppSt.hp - dmg);
+  room.sfTurn++;
+
+  broadcastToUser(userId, { type: 'sf_update', roomId: room.id, playerId: userId, move, dmg, state: JSON.parse(JSON.stringify(room.sfState)) });
+  broadcastToUser(oppId, { type: 'sf_update', roomId: room.id, playerId: userId, move, dmg, state: JSON.parse(JSON.stringify(room.sfState)) });
+
+  const p1 = room.players[0], p2 = room.players[1];
+  if (oppSt.hp <= 0 || room.sfState[p1].hp <= 0 || room.sfState[p2].hp <= 0) {
+    const w = room.sfState[p1].hp > room.sfState[p2].hp ? p1 : room.sfState[p2].hp > room.sfState[p1].hp ? p2 : null;
+    endMatch(room, w);
+  }
+}
+
+// ===================== TETRIS CLASH =====================
+function handleTetrisClash(room, userId, oppId, msg) {
+  if (!room.tetrisState) {
+    room.tetrisState = { [room.players[0]]: { score: 0, lines: 0 }, [room.players[1]]: { score: 0, lines: 0 } };
+    room.tetrisPieces = {};
+    room.tetrisRound = 0;
+  }
+
+  if (msg.type === 'tetris_init') {
+    room.tetrisPieces[userId] = true;
+    broadcastToUser(userId, { type: 'tetris_start', roomId: room.id, pieces: generateTetrisPieces(20) });
+    return;
+  }
+
+  if (msg.linesCleared) {
+    const lines = msg.linesCleared;
+    room.tetrisState[userId].lines += lines;
+    room.tetrisState[userId].score += lines * lines * 100;
+    if (lines >= 2) {
+      room.tetrisState[oppId].penalty = (room.tetrisState[oppId].penalty || 0) + (lines - 1) * 2;
+    }
+  }
+
+  broadcastToUser(oppId, { type: 'tetris_garbage', roomId: room.id, playerId: userId, penalty: msg.linesCleared >= 2 ? (msg.linesCleared - 1) * 2 : 0 });
+
+  if (msg.gameOver) {
+    const p1 = room.players[0], p2 = room.players[1];
+    const w = room.tetrisState[p1].score > room.tetrisState[p2].score ? p1 :
+              room.tetrisState[p2].score > room.tetrisState[p1].score ? p2 : null;
+    endMatch(room, w);
+  }
+}
+
+function generateTetrisPieces(count) {
+  const shapes = ['I','O','T','S','Z','J','L'];
+  const pieces = [];
+  for (let i = 0; i < count; i++) pieces.push(shapes[Math.floor(Math.random() * shapes.length)]);
+  return pieces;
+}
+
+// ===================== BLOCK PUZZLE =====================
+function handleBlockPuzzle(room, userId, oppId, msg) {
+  if (!room.blockState) {
+    room.blockState = { [room.players[0]]: { score: 0, rows: 0 }, [room.players[1]]: { score: 0, rows: 0 } };
+    room.blockTurn = 0;
+  }
+
+  if (msg.type === 'block_init') {
+    broadcastToUser(userId, { type: 'block_start', roomId: room.id });
+    return;
+  }
+
+  if (msg.rowsCleared) {
+    const rows = msg.rowsCleared;
+    const points = rows === 1 ? 100 : rows === 2 ? 300 : rows === 3 ? 500 : 800;
+    room.blockState[userId].score += points;
+    room.blockState[userId].rows += rows;
+
+    broadcastToUser(oppId, { type: 'block_penalty', roomId: room.id, playerId: userId, rows });
+  }
+
+  if (msg.gameOver) {
+    const p1 = room.players[0], p2 = room.players[1];
+    const w = room.blockState[p1].score > room.blockState[p2].score ? p1 :
+              room.blockState[p2].score > room.blockState[p1].score ? p2 : null;
+    endMatch(room, w);
   }
 }
 

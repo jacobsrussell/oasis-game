@@ -180,6 +180,13 @@
       case 'mem_match': handleMemMatch(msg); break;
       case 'math_new': handleMathNew(msg); break;
       case 'math_result': handleMathResult(msg); break;
+      case 'racer_update': handleRacerUpdate(msg); break;
+      case 'box_update': handleBoxUpdate(msg); break;
+      case 'sf_update': handleSFUpdate(msg); break;
+      case 'tetris_start': break;
+      case 'tetris_garbage': handleTetrisGarbage(msg); break;
+      case 'block_start': break;
+      case 'block_penalty': handleBlockPenalty(msg); break;
 
       case 'match_over':
         if (msg.won === true) showToast(`🏆 You won R${msg.amount}!`, 'success');
@@ -301,6 +308,11 @@
       case 'dice-duel': initDice(); break;
       case 'memory-match': initMemory(); break;
       case 'math-rush': initMath(); break;
+      case 'street-racer': initRacer(); break;
+      case 'boxing-ring': initBoxing(); break;
+      case 'street-fighter': initStreetFighter(); break;
+      case 'tetris-clash': initTetrisClash(); break;
+      case 'block-puzzle': initBlockPuzzle(); break;
     }
   }
 
@@ -488,6 +500,394 @@
   function handleMathResult(msg) {
     const s = $('#math-scores');
     if (s) s.textContent = `You: ${msg.scores[user.id] || 0} | Opponent: ${msg.scores[Object.keys(msg.scores).find(k => k !== user.id)] || 0} | Answer: ${msg.answer}`;
+  }
+
+  // --- STREET RACER ---
+  function initRacer() {
+    $('#game-area').innerHTML = `
+      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Race to 500m! Choose your move each turn.</p>
+      <div style="display:flex;justify-content:center;gap:1rem;margin-bottom:1.5rem">
+        <div style="width:200px;height:40px;background:var(--bg3);border-radius:20px;overflow:hidden;border:1px solid var(--border);position:relative">
+          <div id="racer-my-bar" style="height:100%;background:var(--green);width:0%;transition:width 0.5s;border-radius:20px"></div>
+          <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.8rem;font-family:var(--font-display)" id="racer-my-pos">0m</span>
+        </div>
+        <div style="width:200px;height:40px;background:var(--bg3);border-radius:20px;overflow:hidden;border:1px solid var(--border);position:relative">
+          <div id="racer-opp-bar" style="height:100%;background:var(--red);width:0%;transition:width 0.5s;border-radius:20px"></div>
+          <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.8rem;font-family:var(--font-display)" id="racer-opp-pos">0m</span>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:1rem;flex-wrap:wrap">
+        <button class="btn-primary" style="width:auto;padding:0.8rem 2rem" onclick="window.oasisRacer('boost')">⚡ BOOST</button>
+        <button class="btn-secondary" style="width:auto;padding:0.8rem 2rem" onclick="window.oasisRacer('drift')">🔄 DRIFT</button>
+        <button class="btn-secondary" style="width:auto;padding:0.8rem 2rem" onclick="window.oasisRacer('slipstream')">💨 SLIPSTREAM</button>
+        <button class="btn-secondary" style="width:auto;padding:0.8rem 2rem" onclick="window.oasisRacer('ram')">💥 RAM</button>
+      </div>
+      <p id="racer-status" style="text-align:center;margin-top:1rem;color:var(--accent);font-family:var(--font-display)">Choose your move!</p>
+    `;
+  }
+
+  window.oasisRacer = (action) => {
+    if (!currentRoom) return;
+    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, action }));
+  };
+
+  function handleRacerUpdate(msg) {
+    const my = msg.state[user.id];
+    const opp = msg.state[Object.keys(msg.state).find(k => k !== user.id)];
+    const myBar = $('#racer-my-bar');
+    const oppBar = $('#racer-opp-bar');
+    if (myBar) myBar.style.width = `${Math.min(100, (my.pos / 500) * 100)}%`;
+    if (oppBar) oppBar.style.width = `${Math.min(100, (opp.pos / 500) * 100)}%`;
+    const myPos = $('#racer-my-pos');
+    const oppPos = $('#racer-opp-pos');
+    if (myPos) myPos.textContent = `${my.pos}m`;
+    if (oppPos) oppPos.textContent = `${opp.pos}m`;
+    const status = $('#racer-status');
+    if (status) status.textContent = msg.playerId === user.id ? `You ${msg.action}! +${msg.speed}m` : `Opponent ${msg.action}!`;
+  }
+
+  // --- BOXING ---
+  function initBoxing() {
+    $('#game-area').innerHTML = `
+      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Knockout your opponent! Manage your stamina.</p>
+      <div style="display:flex;justify-content:center;gap:3rem;margin-bottom:1.5rem">
+        <div style="text-align:center">
+          <p style="color:var(--green);font-family:var(--font-display);font-size:0.8rem">YOUR HP</p>
+          <div style="width:150px;height:20px;background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+            <div id="box-my-hp" style="height:100%;background:var(--green);width:100%;transition:width 0.3s"></div>
+          </div>
+          <p style="color:var(--blue);font-family:var(--font-display);font-size:0.7rem;margin-top:0.3rem">STAMINA: <span id="box-my-stam">100</span>%</p>
+        </div>
+        <div style="text-align:center">
+          <p style="color:var(--red);font-family:var(--font-display);font-size:0.8rem">OPP HP</p>
+          <div style="width:150px;height:20px;background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+            <div id="box-opp-hp" style="height:100%;background:var(--red);width:100%;transition:width 0.3s"></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:0.8rem;flex-wrap:wrap">
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('jab')">👊 JAB</button>
+        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('hook')">🥊 HOOK</button>
+        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('uppercut')">⬆ UPPERCUT</button>
+        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('block')">🛡 BLOCK</button>
+        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('dodge')">🔄 DODGE</button>
+      </div>
+      <p id="box-status" style="text-align:center;margin-top:1rem;color:var(--accent);font-family:var(--font-display)">Fight!</p>
+    `;
+  }
+
+  window.oasisBox = (punch) => {
+    if (!currentRoom) return;
+    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, punch }));
+  };
+
+  function handleBoxUpdate(msg) {
+    const my = msg.state[user.id];
+    const opp = msg.state[Object.keys(msg.state).find(k => k !== user.id)];
+    const myHp = $('#box-my-hp');
+    const oppHp = $('#box-opp-hp');
+    const myStam = $('#box-my-stam');
+    if (myHp) myHp.style.width = `${my.hp}%`;
+    if (oppHp) oppHp.style.width = `${opp.hp}%`;
+    if (myStam) myStam.textContent = my.stamina;
+    const status = $('#box-status');
+    if (status) status.textContent = msg.playerId === user.id ? `${msg.punch.toUpperCase()}! -${msg.dmg} HP` : `Opponent ${msg.punch}!`;
+  }
+
+  // --- STREET FIGHTER ---
+  function initStreetFighter() {
+    $('#game-area').innerHTML = `
+      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Choose your fighter moves! Build energy for specials.</p>
+      <div style="display:flex;justify-content:center;gap:3rem;margin-bottom:1.5rem">
+        <div style="text-align:center">
+          <p style="color:var(--green);font-family:var(--font-display);font-size:0.8rem">YOUR HP</p>
+          <div style="width:150px;height:20px;background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+            <div id="sf-my-hp" style="height:100%;background:var(--green);width:100%;transition:width 0.3s"></div>
+          </div>
+          <div style="width:150px;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;margin-top:4px;border:1px solid var(--border)">
+            <div id="sf-my-energy" style="height:100%;background:var(--accent);width:50%;transition:width 0.3s"></div>
+          </div>
+        </div>
+        <div style="text-align:center">
+          <p style="color:var(--red);font-family:var(--font-display);font-size:0.8rem">ENEMY HP</p>
+          <div style="width:150px;height:20px;background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">
+            <div id="sf-opp-hp" style="height:100%;background:var(--red);width:100%;transition:width 0.3s"></div>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:0.8rem;flex-wrap:wrap">
+        <button class="btn-primary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisSF('punch')">👊 PUNCH</button>
+        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisSF('kick')">🦵 KICK</button>
+        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem;position:relative" onclick="window.oasisSF('fireball')">🔥 FIREBALL <span style="font-size:0.6rem;color:var(--text-muted)">(30⚡)</span></button>
+        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem;position:relative" onclick="window.oasisSF('shoryuken')">🌀 SHORYUKEN <span style="font-size:0.6rem;color:var(--text-muted)">(40⚡)</span></button>
+        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisSF('block')">🛡 BLOCK</button>
+        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisSF('heal')">💚 HEAL</button>
+      </div>
+      <p id="sf-status" style="text-align:center;margin-top:1rem;color:var(--accent);font-family:var(--font-display)">FIGHT!</p>
+    `;
+  }
+
+  window.oasisSF = (move) => {
+    if (!currentRoom) return;
+    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, move }));
+  };
+
+  function handleSFUpdate(msg) {
+    const my = msg.state[user.id];
+    const opp = msg.state[Object.keys(msg.state).find(k => k !== user.id)];
+    const myHp = $('#sf-my-hp');
+    const myEnergy = $('#sf-my-energy');
+    const oppHp = $('#sf-opp-hp');
+    if (myHp) myHp.style.width = `${my.hp}%`;
+    if (myEnergy) myEnergy.style.width = `${my.energy}%`;
+    if (oppHp) oppHp.style.width = `${opp.hp}%`;
+    const status = $('#sf-status');
+    if (status) status.textContent = msg.playerId === user.id ? `${msg.move.toUpperCase()}! -${msg.dmg}` : `Enemy ${msg.move}!`;
+  }
+
+  // --- TETRIS CLASH ---
+  function initTetrisClash() {
+    const rows = 18, cols = 10;
+    let myBoard = Array.from({ length: rows }, () => Array(cols).fill(0));
+    let oppBoard = Array.from({ length: rows }, () => Array(cols).fill(0));
+    let currentPiece = null, nextPiece = null, score = 0, lines = 0;
+    const pieces = { I: [[1,1,1,1]], O: [[1,1],[1,1]], T: [[0,1,0],[1,1,1]], S: [[0,1,1],[1,1,0]], Z: [[1,1,0],[0,1,1]], J: [[1,0,0],[1,1,1]], L: [[0,0,1],[1,1,1]] };
+    let pieceX = 0, pieceY = 0, pieceKey = '', pieceShape = null;
+
+    function newPiece() {
+      const keys = Object.keys(pieces);
+      pieceKey = nextPiece || keys[Math.floor(Math.random() * keys.length)];
+      nextPiece = keys[Math.floor(Math.random() * keys.length)];
+      pieceShape = pieces[pieceKey];
+      pieceX = Math.floor((cols - pieceShape[0].length) / 2);
+      pieceY = 0;
+      renderTetris();
+    }
+
+    function canPlace(shape, px, py, board) {
+      for (let r = 0; r < shape.length; r++)
+        for (let c = 0; c < shape[r].length; c++)
+          if (shape[r][c]) {
+            const nx = px + c, ny = py + r;
+            if (nx < 0 || nx >= cols || ny >= rows) return false;
+            if (ny >= 0 && board[ny][nx]) return false;
+          }
+      return true;
+    }
+
+    function placePiece() {
+      for (let r = 0; r < pieceShape.length; r++)
+        for (let c = 0; c < pieceShape[r].length; c++)
+          if (pieceShape[r][c] && pieceY + r >= 0) myBoard[pieceY + r][pieceX + c] = 1;
+      clearLines();
+      newPiece();
+      if (!canPlace(pieceShape, pieceX, pieceY, myBoard)) {
+        ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, gameOver: true, linesCleared: 0 }));
+        showToast('Game Over!', 'error');
+        return;
+      }
+    }
+
+    function clearLines() {
+      let cleared = 0;
+      for (let r = rows - 1; r >= 0; r--) {
+        if (myBoard[r].every(c => c)) {
+          myBoard.splice(r, 1);
+          myBoard.unshift(Array(cols).fill(0));
+          cleared++;
+          r++;
+        }
+      }
+      if (cleared > 0) {
+        lines += cleared;
+        score += cleared * cleared * 100;
+        ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, linesCleared: cleared, gameOver: false }));
+      }
+    }
+
+    function renderTetris() {
+      const area = $('#game-area');
+      let html = `<p style="text-align:center;color:var(--text2);margin-bottom:0.5rem">Score: <span style="color:var(--accent);font-family:var(--font-display)">${score}</span> | Lines: <span style="color:var(--accent)">${lines}</span></p>`;
+      html += '<div style="display:flex;justify-content:center;gap:2rem">';
+      html += '<div style="text-align:center"><p style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.3rem">YOU</p>';
+      html += '<div style="display:inline-grid;grid-template-columns:repeat(10,24px);gap:1px;background:var(--bg3);padding:2px;border:1px solid var(--border);border-radius:4px">';
+      const showBoard = myBoard.map(r => [...r]);
+      if (pieceShape) {
+        for (let r = 0; r < pieceShape.length; r++)
+          for (let c = 0; c < pieceShape[r].length; c++)
+            if (pieceShape[r][c] && pieceY + r >= 0 && pieceY + r < rows) showBoard[pieceY + r][pieceX + c] = 2;
+      }
+      for (let r = 0; r < rows; r++)
+        for (let c = 0; c < cols; c++) {
+          const v = showBoard[r][c];
+          html += `<div style="width:24px;height:24px;border-radius:2px;background:${v === 2 ? 'var(--accent)' : v ? 'var(--blue)' : 'var(--surface)'}"></div>`;
+        }
+      html += '</div></div>';
+      html += '</div>';
+      html += '<div style="text-align:center;margin-top:1rem;display:flex;justify-content:center;gap:0.5rem">';
+      html += '<button class="btn-secondary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetris(\'left\')">◀</button>';
+      html += '<button class="btn-primary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetris(\'rotate\')">↻</button>';
+      html += '<button class="btn-secondary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetris(\'right\')">▶</button>';
+      html += '<button class="btn-primary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetris(\'drop\')">⬇ DROP</button>';
+      html += '</div>';
+      area.innerHTML = html;
+    }
+
+    window.oasisTetris = (action) => {
+      switch (action) {
+        case 'left': if (canPlace(pieceShape, pieceX - 1, pieceY, myBoard)) pieceX--; break;
+        case 'right': if (canPlace(pieceShape, pieceX + 1, pieceY, myBoard)) pieceX++; break;
+        case 'rotate': {
+          const rotated = pieceShape[0].map((_, i) => pieceShape.map(row => row[i]).reverse());
+          if (canPlace(rotated, pieceX, pieceY, myBoard)) pieceShape = rotated;
+          break;
+        }
+        case 'drop':
+          while (canPlace(pieceShape, pieceX, pieceY + 1, myBoard)) pieceY++;
+          placePiece();
+          return;
+      }
+      renderTetris();
+    };
+
+    window.oasisTetrisGarbage = (penalty) => {
+      if (penalty > 0) {
+        for (let i = 0; i < penalty; i++) {
+          myBoard.shift();
+          const gap = Math.floor(Math.random() * cols);
+          myBoard.push(Array(cols).fill(1).map((v, idx) => idx === gap ? 0 : 1));
+        }
+        renderTetris();
+      }
+    };
+
+    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, type: 'tetris_init' }));
+    newPiece();
+
+    window.tetrisInterval = setInterval(() => {
+      if (canPlace(pieceShape, pieceX, pieceY + 1, myBoard)) { pieceY++; renderTetris(); }
+      else placePiece();
+    }, 800);
+  }
+
+  function handleTetrisGarbage(msg) {
+    if (msg.playerId !== user.id && msg.penalty > 0 && window.oasisTetrisGarbage) {
+      window.oasisTetrisGarbage(msg.penalty);
+    }
+  }
+
+  // --- BLOCK PUZZLE ---
+  function initBlockPuzzle() {
+    const rows = 8, cols = 8;
+    let board = Array.from({ length: rows }, () => Array(cols).fill(0));
+    let score = 0, totalRows = 0;
+    let currentBlocks = [];
+
+    const blockShapes = [
+      [[1]], [[1,1]], [[1,1,1]], [[1,1,1,1]],
+      [[1,1],[1,1]], [[1,0],[1,1]], [[0,1],[1,1]],
+      [[1,1,0],[0,1,1]], [[0,1,1],[1,1,0]]
+    ];
+
+    function newBlocks() {
+      currentBlocks = [];
+      for (let i = 0; i < 3; i++) {
+        currentBlocks.push(blockShapes[Math.floor(Math.random() * blockShapes.length)]);
+      }
+      renderBlock();
+    }
+
+    function canPlaceBlock(shape, px, py) {
+      for (let r = 0; r < shape.length; r++)
+        for (let c = 0; c < shape[r].length; c++)
+          if (shape[r][c]) {
+            const nx = px + c, ny = py + r;
+            if (nx < 0 || nx >= cols || ny < 0 || ny >= rows || board[ny][nx]) return false;
+          }
+      return true;
+    }
+
+    function placeBlock(idx, px, py) {
+      const shape = currentBlocks[idx];
+      if (!shape || !canPlaceBlock(shape, px, py)) return;
+      for (let r = 0; r < shape.length; r++)
+        for (let c = 0; c < shape[r].length; c++)
+          if (shape[r][c]) board[py + r][px + c] = 1;
+      currentBlocks.splice(idx, 1);
+      clearBlockRows();
+      if (currentBlocks.length === 0) newBlocks();
+      renderBlock();
+      checkBlockGameOver();
+    }
+
+    function clearBlockRows() {
+      let cleared = 0;
+      for (let r = rows - 1; r >= 0; r--) {
+        if (board[r].every(c => c)) {
+          board.splice(r, 1);
+          board.unshift(Array(cols).fill(0));
+          cleared++;
+          r++;
+        }
+      }
+      for (let c = cols - 1; c >= 0; c--) {
+        if (board.every(r => r[c])) {
+          board.forEach(r => r.splice(c, 1));
+          board.forEach(r => r.unshift(0));
+          cleared++;
+          c++;
+        }
+      }
+      if (cleared > 0) {
+        const pts = cleared === 1 ? 100 : cleared === 2 ? 300 : cleared === 3 ? 500 : 800;
+        score += pts;
+        totalRows += cleared;
+        ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, rowsCleared: cleared, gameOver: false }));
+      }
+    }
+
+    function checkBlockGameOver() {
+      for (const block of currentBlocks) {
+        for (let r = 0; r < rows; r++)
+          for (let c = 0; c < cols; c++)
+            if (canPlaceBlock(block, c, r)) return;
+      }
+      ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, gameOver: true, rowsCleared: 0 }));
+      showToast('No moves left! Game Over.', 'error');
+    }
+
+    function renderBlock() {
+      const area = $('#game-area');
+      let html = `<p style="text-align:center;color:var(--text2);margin-bottom:0.5rem">Score: <span style="color:var(--accent);font-family:var(--font-display)">${score}</span></p>`;
+      html += '<div style="display:flex;justify-content:center;gap:2rem;align-items:start">';
+      html += '<div style="display:inline-grid;grid-template-columns:repeat(8,32px);gap:1px;background:var(--bg3);padding:2px;border:1px solid var(--border);border-radius:4px">';
+      for (let r = 0; r < rows; r++)
+        for (let c = 0; c < cols; c++)
+          html += `<div data-br="${r}" data-bc="${c}" style="width:32px;height:32px;border-radius:2px;background:${board[r][c] ? 'var(--accent)' : 'var(--surface)'};cursor:pointer" onclick="window.oasisBlockPlace(${r},${c})"></div>`;
+      html += '</div>';
+      html += '<div style="display:flex;flex-direction:column;gap:0.5rem">';
+      html += '<p style="font-size:0.7rem;color:var(--text-muted)">BLOCKS</p>';
+      currentBlocks.forEach((block, idx) => {
+        html += `<div style="display:inline-grid;grid-template-columns:repeat(${block[0].length},16px);gap:1px;background:var(--bg3);padding:4px;border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="window.oasisBlockSelect(${idx})">`;
+        for (let r = 0; r < block.length; r++)
+          for (let c = 0; c < block[r].length; c++)
+            html += `<div style="width:16px;height:16px;border-radius:2px;background:${block[r][c] ? 'var(--blue)' : 'transparent'}"></div>`;
+        html += '</div>';
+      });
+      html += '</div></div>';
+      area.innerHTML = html;
+    }
+
+    let selectedBlock = null;
+    window.oasisBlockSelect = (idx) => { selectedBlock = idx; showToast('Tap a cell on the board to place', ''); };
+    window.oasisBlockPlace = (r, c) => { if (selectedBlock !== null) { placeBlock(selectedBlock, c, r); selectedBlock = null; } };
+
+    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, type: 'block_init' }));
+    newBlocks();
+  }
+
+  function handleBlockPenalty(msg) {
+    if (msg.playerId !== user.id) showToast(`Opponent cleared ${msg.rows} rows!`, 'error');
   }
 
   // ===================== WALLET =====================
