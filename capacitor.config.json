@@ -3,7 +3,8 @@
   "appName": "Oasis",
   "webDir": "public",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "url": "https://oasis-game.onrender.com"
   },
   "android": {
     "backgroundColor": "#0d0a08",
