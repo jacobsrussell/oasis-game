@@ -175,22 +175,8 @@
         startGame(msg.game, msg.roomId, msg.pot, msg.opponent);
         break;
 
-      case 'game_update': handleTTTUpdate(msg); break;
-      case 'rps_result': handleRPSResult(msg); break;
-      case 'rps_waiting': showToast('Waiting for opponent...', ''); break;
-      case 'hl_update': handleHLUpdate(msg); break;
-      case 'dice_roll': handleDiceRoll(msg); break;
-      case 'mem_flip': handleMemFlip(msg); break;
-      case 'mem_match': handleMemMatch(msg); break;
-      case 'math_new': handleMathNew(msg); break;
-      case 'math_result': handleMathResult(msg); break;
-      case 'racer_update': handleRacerUpdate(msg); break;
-      case 'box_update': handleBoxUpdate(msg); break;
-      case 'sf_update': handleSFUpdate(msg); break;
-      case 'tetris_start': break;
-      case 'tetris_garbage': handleTetrisGarbage(msg); break;
-      case 'block_start': break;
-      case 'block_penalty': handleBlockPenalty(msg); break;
+      case 'c4_update': handleC4Update(msg); break;
+      case 'opponent_scored': showToast('Opponent finished! Waiting...', ''); break;
 
       case 'match_over':
         if (msg.freePlay) {
@@ -307,14 +293,18 @@
   };
 
   // ===================== GAME ARENA =====================
+  let gameCleanup = null;
   function startGame(gameId, roomId, pot, opponent) {
     navigate('game');
+    if (gameCleanup) { gameCleanup(); gameCleanup = null; }
+    if (window.tetrisInterval) { clearInterval(window.tetrisInterval); window.tetrisInterval = null; }
     const arena = $('#game-arena');
     const isFreePlay = window._freePlayMode;
+    const g = GAMES.find(g => g.id === gameId);
     arena.innerHTML = `
       <div style="width:100%;max-width:600px;margin:0 auto">
         <div class="game-header">
-          <h2>${GAMES.find(g => g.id === gameId)?.icon || '🎮'} ${GAMES.find(g => g.id === gameId)?.name || gameId}</h2>
+          <h2>${g?.icon || '🎮'} ${g?.name || gameId}</h2>
           <div class="pot">${isFreePlay ? '🎮 Free Play' : 'Pot: R' + pot}</div>
           <div class="opponent">vs ${opponent}</div>
         </div>
@@ -323,593 +313,518 @@
     `;
     window._freePlayMode = false;
 
-    switch (gameId) {
-      case 'tic-tac-toe': initTTT(); break;
-      case 'rps': initRPS(); break;
-      case 'higher-lower': initHL(); break;
-      case 'dice-duel': initDice(); break;
-      case 'memory-match': initMemory(); break;
-      case 'math-rush': initMath(); break;
-      case 'street-racer': initRacer(); break;
-      case 'boxing-ring': initBoxing(); break;
-      case 'street-fighter': initStreetFighter(); break;
-      case 'tetris-clash': initTetrisClash(); break;
-      case 'block-puzzle': initBlockPuzzle(); break;
+    const gameArea = $('#game-area');
+    const sendScore = (score) => {
+      if (currentRoom) ws.send(JSON.stringify({ type: 'game_score', roomId: currentRoom, score }));
+    };
+
+    const games = {
+      'flappy-bird': () => gameFlappyBird(gameArea, sendScore),
+      '2048': () => game2048(gameArea, sendScore),
+      'snake': () => gameSnake(gameArea, sendScore),
+      'connect-4': () => gameConnect4(gameArea, roomId),
+      'breakout': () => gameBreakout(gameArea, sendScore),
+      'space-invaders': () => gameSpaceInvaders(gameArea, sendScore),
+      'whack-a-mole': () => gameWhackAMole(gameArea, sendScore),
+      'minesweeper': () => gameMinesweeper(gameArea, sendScore),
+      'tetris': () => gameTetris(gameArea, sendScore),
+      'bubble-shooter': () => gameBubbleShooter(gameArea, sendScore),
+      'doodle-jump': () => gameDoodleJump(gameArea, sendScore),
+    };
+    if (games[gameId]) gameCleanup = games[gameId]();
+  }
+
+  // ==================== 1. FLAPPY BIRD ====================
+  function gameFlappyBird(area, sendScore) {
+    const W = 320, H = 480;
+    const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.style.cssText = 'display:block;margin:0 auto;border-radius:12px;border:2px solid var(--border)';
+    area.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    let bird = { y: H / 2, vy: 0 }, pipes = [], score = 0, over = false, frame = 0;
+    const flap = () => { if (!over) bird.vy = -7; };
+    cvs.addEventListener('pointerdown', flap);
+    const kHandler = (e) => { if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); flap(); } };
+    document.addEventListener('keydown', kHandler);
+    const loop = setInterval(() => {
+      if (over) return;
+      bird.vy += 0.45; bird.y += bird.vy;
+      if (frame % 90 === 0) { const gap = 130, gy = 50 + Math.random() * (H - gap - 100); pipes.push({ x: W, gy, gap, scored: false }); }
+      pipes.forEach(p => p.x -= 2.5);
+      pipes = pipes.filter(p => p.x > -40);
+      pipes.forEach(p => { if (!p.scored && p.x + 30 < 80) { score++; p.scored = true; } });
+      if (bird.y < 0 || bird.y > H) { over = true; sendScore(score); showToast(`Flappy Bird: ${score} points`, score > 0 ? 'success' : 'error'); }
+      pipes.forEach(p => { if (80 + 12 > p.x && 80 - 12 < p.x + 30 && (bird.y - 12 < p.gy || bird.y + 12 > p.gy + p.gap)) { over = true; sendScore(score); showToast(`Flappy Bird: ${score} points`, 'error'); } });
+      ctx.fillStyle = '#1a0a2e'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#00ff88'; pipes.forEach(p => { ctx.fillRect(p.x, 0, 30, p.gy); ctx.fillRect(p.x, p.gy + p.gap, 30, H); });
+      ctx.fillStyle = '#ffcc00'; ctx.beginPath(); ctx.arc(80, bird.y, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 28px Orbitron,sans-serif'; ctx.textAlign = 'center'; ctx.fillText(score, W / 2, 45);
+      if (over) { ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0, 0, W, H); ctx.fillStyle = '#fff'; ctx.font = 'bold 24px Orbitron,sans-serif'; ctx.fillText('GAME OVER', W / 2, H / 2 - 10); ctx.font = '18px Orbitron,sans-serif'; ctx.fillText(`Score: ${score}`, W / 2, H / 2 + 25); }
+      frame++;
+    }, 1000 / 60);
+    return () => { clearInterval(loop); document.removeEventListener('keydown', kHandler); };
+  }
+
+  // ==================== 2. 2048 ====================
+  function game2048(area, sendScore) {
+    let grid = Array(4).fill(null).map(() => Array(4).fill(0));
+    let score = 0, over = false;
+    function addTile() { const empty = []; for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if (!grid[r][c]) empty.push([r, c]); if (!empty.length) return; const [r, c] = empty[Math.floor(Math.random() * empty.length)]; grid[r][c] = Math.random() < 0.9 ? 2 : 4; }
+    addTile(); addTile();
+    function slide(row) { let a = row.filter(x => x), merged = false; for (let i = 0; i < a.length - 1; i++) { if (a[i] === a[i + 1]) { a[i] *= 2; score += a[i]; a.splice(i + 1, 1); merged = true; } } while (a.length < 4) a.push(0); return a; }
+    function move(dir) {
+      if (over) return; let moved = false;
+      const g = grid.map(r => [...r]);
+      if (dir === 'left') { for (let r = 0; r < 4; r++) { const n = slide(g[r]); if (n.join(',') !== g[r].join(',')) moved = true; grid[r] = n; } }
+      else if (dir === 'right') { for (let r = 0; r < 4; r++) { const n = slide(g[r].slice().reverse()).reverse(); if (n.join(',') !== g[r].join(',')) moved = true; grid[r] = n; } }
+      else if (dir === 'up') { for (let c = 0; c < 4; c++) { const col = [g[0][c], g[1][c], g[2][c], g[3][c]]; const n = slide(col); if (n.join(',') !== col.join(',')) moved = true; for (let r = 0; r < 4; r++) grid[r][c] = n[r]; } }
+      else if (dir === 'down') { for (let c = 0; c < 4; c++) { const col = [g[3][c], g[2][c], g[1][c], g[0][c]]; const n = slide(col).reverse(); if (n.join(',') !== [g[0][c], g[1][c], g[2][c], g[3][c]].join(',')) moved = true; for (let r = 0; r < 4; r++) grid[r][c] = n[r]; } }
+      if (moved) addTile();
+      if (!canMove()) { over = true; sendScore(score); showToast(`2048: ${score} points`, 'success'); }
     }
-  }
-
-  // --- TIC TAC TOE ---
-  function initTTT() {
-    $('#game-area').innerHTML = `
-      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Get 3 in a row to win rounds. First to 2 rounds wins!</p>
-      <div class="ttt-board" id="ttt-board">${Array(9).fill('').map((_, i) => `<div class="ttt-cell" data-cell="${i}" onclick="window.oasisTTTClick(${i})"></div>`).join('')}</div>
-      <p id="ttt-status" style="text-align:center;margin-top:1rem;color:var(--accent);font-family:var(--font-display)">Your turn</p>
-    `;
-  }
-
-  window.oasisTTTClick = (cell) => {
-    if (!currentRoom) return;
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, cell }));
-  };
-
-  function handleTTTUpdate(msg) {
-    const cells = $$('.ttt-cell');
-    if (cells[msg.cell]) {
-      cells[msg.cell].textContent = msg.mark;
-      cells[msg.cell].classList.add('taken');
+    function canMove() { for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { if (!grid[r][c]) return true; if (c < 3 && grid[r][c] === grid[r][c + 1]) return true; if (r < 3 && grid[r][c] === grid[r + 1][c]) return true; } return false; }
+    const colors = { 0: 'transparent', 2: '#eee4da', 4: '#ede0c8', 8: '#f2b179', 16: '#f59563', 32: '#f67c5f', 64: '#f65e3b', 128: '#edcf72', 256: '#edcc61', 512: '#edc850', 1024: '#edc53f', 2048: '#edc22e' };
+    function render() {
+      let html = `<p style="text-align:center;color:var(--text2);margin-bottom:0.5rem">Score: <b style="color:var(--accent)">${score}</b></p><div style="display:inline-grid;grid-template-columns:repeat(4,70px);gap:6px;background:var(--bg3);padding:8px;border-radius:12px;border:2px solid var(--border);margin:0 auto;display:block;width:fit-content">`;
+      for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) { const v = grid[r][c]; html += `<div style="width:70px;height:70px;border-radius:8px;background:${colors[v] || '#3c3a32'};display:flex;align-items:center;justify-content:center;font:bold 22px Orbitron,sans-serif;color:${v > 4 ? '#fff' : '#776e65'}">${v || ''}</div>`; }
+      html += '</div>';
+      html += '<p style="text-align:center;color:var(--text-muted);margin-top:1rem;font-size:0.85rem">Use arrow keys or swipe to slide tiles</p>';
+      area.innerHTML = html;
     }
-    if (msg.scores) {
-      const status = $('#ttt-status');
-      if (status) status.textContent = msg.nextTurn ? 'Your turn' : "Opponent's turn";
+    const kHandler = (e) => { const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' }; if (map[e.key]) { e.preventDefault(); move(map[e.key]); render(); } };
+    document.addEventListener('keydown', kHandler);
+    let tx, ty;
+    const tStart = (e) => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; };
+    const tEnd = (e) => { const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'right' : 'left'); else move(dy > 0 ? 'down' : 'up'); render(); };
+    area.addEventListener('touchstart', tStart, { passive: true });
+    area.addEventListener('touchend', tEnd, { passive: true });
+    render();
+    return () => document.removeEventListener('keydown', kHandler);
+  }
+
+  // ==================== 3. SNAKE ====================
+  function gameSnake(area, sendScore) {
+    const W = 300, H = 300, CS = 15;
+    const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.style.cssText = 'display:block;margin:0 auto;border-radius:12px;border:2px solid var(--border)';
+    area.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    let snake = [{ x: 7, y: 7 }], dir = { x: 1, y: 0 }, food = spawnFood(), score = 0, over = false, speed = 120;
+    function spawnFood() { let p; do { p = { x: Math.floor(Math.random() * (W / CS)), y: Math.floor(Math.random() * (H / CS)) }; } while (snake.some(s => s.x === p.x && s.y === p.y)); return p; }
+    function tick() {
+      if (over) return;
+      const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+      if (head.x < 0 || head.x >= W / CS || head.y < 0 || head.y >= H / CS || snake.some(s => s.x === head.x && s.y === head.y)) {
+        over = true; sendScore(score); showToast(`Snake: ${score} points`, score > 5 ? 'success' : 'error'); return;
+      }
+      snake.unshift(head);
+      if (head.x === food.x && head.y === food.y) { score++; food = spawnFood(); if (speed > 60) speed -= 3; }
+      else snake.pop();
+      ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, W, H);
+      snake.forEach((s, i) => { ctx.fillStyle = i === 0 ? '#00ff88' : '#00cc66'; ctx.fillRect(s.x * CS + 1, s.y * CS + 1, CS - 2, CS - 2); });
+      ctx.fillStyle = '#ff4444'; ctx.beginPath(); ctx.arc(food.x * CS + CS / 2, food.y * CS + CS / 2, CS / 2 - 1, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 16px Orbitron,sans-serif'; ctx.textAlign = 'left'; ctx.fillText(`Score: ${score}`, 8, 18);
     }
+    const loop = setInterval(tick, speed);
+    const kHandler = (e) => {
+      const map = { ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 }, ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 } };
+      if (map[e.key]) { e.preventDefault(); const n = map[e.key]; if (n.x !== -dir.x || n.y !== -dir.y) dir = n; }
+    };
+    document.addEventListener('keydown', kHandler);
+    return () => { clearInterval(loop); document.removeEventListener('keydown', kHandler); };
   }
 
-  // --- RPS ---
-  function initRPS() {
-    $('#game-area').innerHTML = `
-      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Best of 3 rounds wins!</p>
-      <div class="rps-choices">
-        <div class="rps-choice" onclick="window.oasisRPS('rock')">✊</div>
-        <div class="rps-choice" onclick="window.oasisRPS('paper')">✋</div>
-        <div class="rps-choice" onclick="window.oasisRPS('scissors')">✌️</div>
-      </div>
-      <div id="rps-result" class="rps-result"></div>
-      <div id="rps-score" style="text-align:center;color:var(--text2)"></div>
-    `;
-  }
-
-  window.oasisRPS = (move) => {
-    if (!currentRoom) return;
-    $$('.rps-choice').forEach(c => c.classList.remove('selected'));
-    event.target.closest('.rps-choice').classList.add('selected');
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, move }));
-  };
-
-  function handleRPSResult(msg) {
-    const r = $('#rps-result');
-    if (r) r.textContent = `You: ${msg.move1} vs Opponent: ${msg.move2}`;
-    const s = $('#rps-score');
-    if (s) s.textContent = `Score: ${msg.scores[user.id] || 0} - ${msg.scores[Object.keys(msg.scores).find(k => k !== user.id)] || 0}`;
-    $$('.rps-choice').forEach(c => c.classList.remove('selected'));
-  }
-
-  // --- HIGHER LOWER ---
-  function initHL() {
-    $('#game-area').innerHTML = `
-      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Guess if the next card is higher or lower!</p>
-      <div class="hl-card-display">
-        <div class="hl-card" id="hl-current">?</div>
-      </div>
-      <div class="hl-buttons">
-        <button class="btn-secondary" onclick="window.oasisHL('lower')">⬇ Lower</button>
-        <button class="btn-primary" onclick="window.oasisHL('higher')" style="width:auto">⬆ Higher</button>
-      </div>
-      <div id="hl-score" style="text-align:center;margin-top:1rem;color:var(--text2)"></div>
-    `;
-  }
-
-  window.oasisHL = (guess) => {
-    if (!currentRoom) return;
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, guess }));
-  };
-
-  function handleHLUpdate(msg) {
-    const el = $('#hl-current');
-    if (el) el.textContent = `${msg.card.name}`;
-    const s = $('#hl-score');
-    if (s) s.textContent = `Score: ${msg.scores[user.id] || 0} | Round: ${msg.round}`;
-    showToast(msg.correct ? '✅ Correct!' : '❌ Wrong!', msg.correct ? 'success' : 'error');
-  }
-
-  // --- DICE ---
-  function initDice() {
-    $('#game-area').innerHTML = `
-      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Roll the dice! Highest total after 6 rolls wins!</p>
-      <div class="dice-area">
-        <div class="dice-display" id="dice-display">🎲</div>
-        <div class="dice-scores" id="dice-scores"></div>
-        <button class="btn-primary" id="dice-roll-btn" onclick="window.oasisDiceRoll()" style="width:auto;padding:1rem 3rem">ROLL DICE</button>
-        <p id="dice-status" style="margin-top:1rem;color:var(--text2)"></p>
-      </div>
-    `;
-  }
-
-  window.oasisDiceRoll = () => {
-    if (!currentRoom) return;
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom }));
-    $('#dice-roll-btn').disabled = true;
-  };
-
-  function handleDiceRoll(msg) {
-    const display = $('#dice-display');
-    const emojis = ['⚀','⚁','⚂','⚃','⚄','⚅'];
-    const die1 = Math.floor(msg.roll / 2);
-    const die2 = msg.roll - die1 - 2;
-    if (display) display.textContent = `${emojis[Math.min(die1, 5)]} ${emojis[Math.min(die2, 5)]}`;
-
-    const scores = $('#dice-scores');
-    if (scores) {
-      scores.innerHTML = Object.entries(msg.totals).map(([pid, total]) =>
-        `<div><strong>${pid === user.id ? 'You' : 'Opponent'}</strong>: ${total}</div>`
-      ).join('');
+  // ==================== 4. CONNECT 4 ====================
+  function gameConnect4(area, roomId) {
+    let board = Array(6).fill(null).map(() => Array(7).fill(0));
+    let myTurn = true;
+    function render() {
+      let html = `<p style="text-align:center;color:var(--text2);margin-bottom:0.5rem" id="c4-status">${myTurn ? 'Your turn - click a column' : 'Opponent\'s turn...'}</p>`;
+      html += '<div style="display:inline-grid;grid-template-columns:repeat(7,50px);gap:4px;background:#1a3a8a;padding:8px;border-radius:12px;margin:0 auto;display:block;width:fit-content">';
+      for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) {
+        const v = board[r][c];
+        const bg = v === 1 ? '#ff4444' : v === 2 ? '#ffcc00' : '#111';
+        html += `<div style="width:50px;height:50px;border-radius:50%;background:${bg};border:2px solid #0d1b4a;cursor:${myTurn && v === 0 ? 'pointer' : 'default'}" onclick="window.oasisC4Drop(${c})"></div>`;
+      }
+      html += '</div>';
+      area.innerHTML = html;
     }
+    window.oasisC4Drop = (col) => {
+      if (!myTurn || !currentRoom) return;
+      ws.send(JSON.stringify({ type: 'game_c4', roomId: currentRoom, col }));
+      myTurn = false; render();
+    };
+    window.oasisC4Handler = (msg) => {
+      if (msg.board) board = msg.board;
+      myTurn = msg.yourTurn;
+      if (msg.win) { showToast(msg.lastMove?.mark === 1 ? 'You won Connect 4!' : 'Bot won Connect 4!', msg.lastMove?.mark === 1 ? 'success' : 'error'); }
+      render();
+    };
+    render();
+    return () => { delete window.oasisC4Drop; delete window.oasisC4Handler; };
+  }
+  function handleC4Update(msg) { if (window.oasisC4Handler) window.oasisC4Handler(msg); }
 
-    const myTurn = msg.playerId === user.id;
-    const status = $('#dice-status');
-    if (status) status.textContent = myTurn ? 'Your roll!' : "Opponent's roll";
-    if (myTurn) setTimeout(() => { const b = $('#dice-roll-btn'); if (b) b.disabled = false; }, 500);
+  // ==================== 5. BREAKOUT ====================
+  function gameBreakout(area, sendScore) {
+    const W = 400, H = 300;
+    const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.style.cssText = 'display:block;margin:0 auto;border-radius:12px;border:2px solid var(--border)';
+    area.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    let paddleX = W / 2 - 40, score = 0, over = false;
+    let ball = { x: W / 2, y: H - 30, vx: 3, vy: -3 };
+    let bricks = [];
+    const BCOLS = 8, BROWS = 5, BW = 44, BH = 14, BPAD = 4;
+    const bcolors = ['#ff4444', '#ff8844', '#ffcc00', '#44ff44', '#4488ff'];
+    for (let r = 0; r < BROWS; r++) for (let c = 0; c < BCOLS; c++) bricks.push({ x: c * (BW + BPAD) + 12, y: r * (BH + BPAD) + 30, w: BW, h: BH, color: bcolors[r], alive: true });
+    function tick() {
+      if (over) return;
+      ball.x += ball.vx; ball.y += ball.vy;
+      if (ball.x < 0 || ball.x > W) ball.vx *= -1;
+      if (ball.y < 0) ball.vy *= -1;
+      if (ball.y > H) { over = true; sendScore(score); showToast(`Breakout: ${score} points`, 'error'); return; }
+      if (ball.y + 8 > H - 15 && ball.x > paddleX && ball.x < paddleX + 80) { ball.vy = -Math.abs(ball.vy); ball.vx += (ball.x - (paddleX + 40)) * 0.05; }
+      bricks.forEach(b => { if (b.alive && ball.x > b.x && ball.x < b.x + b.w && ball.y > b.y && ball.y < b.y + b.h) { b.alive = false; ball.vy *= -1; score += 10; } });
+      if (bricks.every(b => !b.alive)) { over = true; sendScore(score); showToast(`Breakout: Perfect! ${score} pts`, 'success'); return; }
+      ctx.fillStyle = '#0a0a2e'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#ffcc00'; ctx.fillRect(paddleX, H - 15, 80, 12);
+      bricks.forEach(b => { if (b.alive) { ctx.fillStyle = b.color; ctx.fillRect(b.x, b.y, b.w, b.h); } });
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ball.x, ball.y, 8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Orbitron,sans-serif'; ctx.fillText(`Score: ${score}`, 8, 18);
+    }
+    const mHandler = (e) => { const rect = cvs.getBoundingClientRect(); paddleX = Math.max(0, Math.min(W - 80, (e.clientX - rect.left) * (W / rect.width) - 40)); };
+    cvs.addEventListener('pointermove', mHandler);
+    const loop = setInterval(tick, 1000 / 60);
+    return () => { clearInterval(loop); cvs.removeEventListener('pointermove', mHandler); };
   }
 
-  // --- MEMORY ---
-  function initMemory() {
-    $('#game-area').innerHTML = `
-      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Find matching pairs! Most pairs wins.</p>
-      <div class="mem-board" id="mem-board">${Array(16).fill('').map((_, i) => `<div class="mem-card" data-idx="${i}" onclick="window.oasisMemClick(${i})">?</div>`).join('')}</div>
-      <div id="mem-scores" style="text-align:center;margin-top:1rem;color:var(--text2)"></div>
-    `;
+  // ==================== 6. SPACE INVADERS ====================
+  function gameSpaceInvaders(area, sendScore) {
+    const W = 360, H = 400;
+    const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.style.cssText = 'display:block;margin:0 auto;border-radius:12px;border:2px solid var(--border)';
+    area.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    let shipX = W / 2, bullets = [], score = 0, over = false;
+    let aliens = [];
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 8; c++) aliens.push({ x: 30 + c * 38, y: 30 + r * 32, alive: true });
+    let alienDir = 1, alienSpeed = 0.5, alienDropTimer = 0;
+    let keys = {};
+    const kDown = (e) => { keys[e.code] = true; if (['ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault(); };
+    const kUp = (e) => { keys[e.code] = false; };
+    document.addEventListener('keydown', kDown);
+    document.addEventListener('keyup', kUp);
+    let shootCD = 0;
+    function tick() {
+      if (over) return;
+      if (keys['ArrowLeft']) shipX = Math.max(15, shipX - 4);
+      if (keys['ArrowRight']) shipX = Math.min(W - 15, shipX + 4);
+      if (keys['Space'] && shootCD <= 0) { bullets.push({ x: shipX, y: H - 40 }); shootCD = 15; }
+      shootCD--;
+      bullets.forEach(b => b.y -= 6);
+      bullets = bullets.filter(b => b.y > 0);
+      let moveDown = false;
+      aliens.forEach(a => { if (!a.alive) return; a.x += alienDir * alienSpeed; if (a.x > W - 20 || a.x < 20) moveDown = true; });
+      if (moveDown) { alienDir *= -1; aliens.forEach(a => a.y += 12); }
+      bullets.forEach(b => { aliens.forEach(a => { if (a.alive && Math.abs(b.x - a.x) < 14 && Math.abs(b.y - a.y) < 10) { a.alive = false; b.y = -100; score += 25; } }); });
+      if (aliens.every(a => !a.alive)) { over = true; sendScore(score); showToast(`Space Invaders: Perfect! ${score} pts`, 'success'); return; }
+      if (aliens.some(a => a.alive && a.y > H - 60)) { over = true; sendScore(score); showToast(`Space Invaders: ${score} pts`, 'error'); return; }
+      ctx.fillStyle = '#000011'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#00ff88'; ctx.beginPath(); ctx.moveTo(shipX, H - 45); ctx.lineTo(shipX - 12, H - 25); ctx.lineTo(shipX + 12, H - 25); ctx.fill();
+      ctx.fillStyle = '#ffff00'; bullets.forEach(b => { ctx.fillRect(b.x - 2, b.y, 4, 10); });
+      ctx.fillStyle = '#ff4444'; aliens.forEach(a => { if (a.alive) { ctx.fillRect(a.x - 12, a.y - 8, 24, 16); ctx.fillStyle = '#fff'; ctx.fillRect(a.x - 6, a.y - 4, 4, 4); ctx.fillRect(a.x + 2, a.y - 4, 4, 4); ctx.fillStyle = '#ff4444'; } });
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Orbitron,sans-serif'; ctx.fillText(`Score: ${score}`, 8, 18);
+    }
+    const loop = setInterval(tick, 1000 / 60);
+    return () => { clearInterval(loop); document.removeEventListener('keydown', kDown); document.removeEventListener('keyup', kUp); };
   }
 
-  window.oasisMemClick = (idx) => {
-    if (!currentRoom) return;
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, index: idx }));
-  };
-
-  function handleMemFlip(msg) {
-    const card = $(`.mem-card[data-idx="${msg.index}"]`);
-    if (card) { card.textContent = msg.value; card.classList.add('flipped'); }
+  // ==================== 7. WHACK A MOLE ====================
+  function gameWhackAMole(area, sendScore) {
+    let score = 0, timeLeft = 30, active = -1;
+    function render() {
+      let html = `<p style="text-align:center;color:var(--text2);margin-bottom:0.5rem">Score: <b style="color:var(--accent)">${score}</b> | Time: <b style="color:${timeLeft < 10 ? 'var(--red)' : 'var(--green)'}">${timeLeft}s</b></p>`;
+      html += '<div style="display:inline-grid;grid-template-columns:repeat(3,80px);gap:10px;margin:0 auto;display:block;width:fit-content">';
+      for (let i = 0; i < 9; i++) {
+        const up = i === active;
+        html += `<div style="width:80px;height:80px;border-radius:50%;background:${up ? '#4a3520' : '#2a1a10'};border:3px solid ${up ? '#8B4513' : '#5a3a20'};display:flex;align-items:center;justify-content:center;font-size:2rem;cursor:${up ? 'pointer' : 'default'};transition:all 0.15s" onclick="window.oasisWhack(${i})">${up ? '🐹' : '🕳️'}</div>`;
+      }
+      html += '</div>';
+      area.innerHTML = html;
+    }
+    window.oasisWhack = (i) => { if (i === active) { score++; active = -1; render(); } };
+    render();
+    const moleInterval = setInterval(() => { if (timeLeft > 0) { active = Math.floor(Math.random() * 9); render(); } }, 700);
+    const clearMole = setInterval(() => { active = -1; render(); }, 500);
+    const timerInterval = setInterval(() => { timeLeft--; if (timeLeft <= 0) { clearInterval(moleInterval); clearInterval(timerInterval); clearInterval(clearMole); over = true; sendScore(score); showToast(`Whack-a-Mole: ${score} hits!`, score > 10 ? 'success' : 'error'); } render(); }, 1000);
+    let over = false;
+    return () => { clearInterval(moleInterval); clearInterval(timerInterval); clearInterval(clearMole); delete window.oasisWhack; };
   }
 
-  function handleMemMatch(msg) {
-    msg.indices.forEach(idx => {
-      const card = $(`.mem-card[data-idx="${idx}"]`);
-      if (card) { card.classList.add('matched'); card.classList.remove('flipped'); }
-    });
-    const s = $('#mem-scores');
-    if (s) s.textContent = `You: ${msg.playerId === user.id ? '+' : ''} pair`;
+  // ==================== 8. MINESWEEPER ====================
+  function gameMinesweeper(area, sendScore) {
+    const ROWS = 10, COLS = 10, MINES = 12;
+    let board = Array(ROWS).fill(null).map(() => Array(COLS).fill(0));
+    let revealed = Array(ROWS).fill(null).map(() => Array(COLS).fill(false));
+    let flagged = Array(ROWS).fill(null).map(() => Array(COLS).fill(false));
+    let mines = 0, over = false, started = false;
+    function placeMines(safeR, safeC) {
+      let placed = 0;
+      while (placed < MINES) {
+        const r = Math.floor(Math.random() * ROWS), c = Math.floor(Math.random() * COLS);
+        if (board[r][c] === -1 || (Math.abs(r - safeR) <= 1 && Math.abs(c - safeC) <= 1)) continue;
+        board[r][c] = -1; placed++;
+      }
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (board[r][c] === -1) continue;
+        let cnt = 0;
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) { const nr = r + dr, nc = c + dc; if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && board[nr][nc] === -1) cnt++; }
+        board[r][c] = cnt;
+      }
+    }
+    function reveal(r, c) {
+      if (r < 0 || r >= ROWS || c < 0 || c >= COLS || revealed[r][c] || flagged[r][c]) return;
+      revealed[r][c] = true;
+      if (board[r][c] === 0) { for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) reveal(r + dr, c + dc); }
+    }
+    function checkWin() {
+      let safe = 0, rev = 0;
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { if (board[r][c] !== -1) safe++; if (revealed[r][c] && board[r][c] !== -1) rev++; }
+      return safe === rev;
+    }
+    const numColors = ['', '#0000ff', '#008000', '#ff0000', '#000080', '#800000', '#008080', '#000', '#808080'];
+    function render() {
+      let html = `<p style="text-align:center;color:var(--text2);margin-bottom:0.5rem">Mines: ${MINES} | Revealed: ${revealed.flat().filter(Boolean).length}</p>`;
+      html += '<div style="display:inline-grid;grid-template-columns:repeat(10,30px);gap:2px;margin:0 auto;display:block;width:fit-content">';
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (revealed[r][c]) {
+          const v = board[r][c];
+          html += `<div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;font:bold 14px sans-serif;background:${v === -1 ? '#ff4444' : '#ddd'};color:${numColors[v] || '#000'};border-radius:3px">${v === -1 ? '💣' : (v || '')}</div>`;
+        } else {
+          html += `<div style="width:30px;height:30px;background:#888;border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:12px" onclick="window.oasisMSReveal(${r},${c})" oncontextmenu="event.preventDefault();window.oasisMSFlag(${r},${c})">${flagged[r][c] ? '🚩' : ''}</div>`;
+        }
+      }
+      html += '</div>';
+      html += '<p style="text-align:center;color:var(--text-muted);margin-top:0.8rem;font-size:0.8rem">Click to reveal | Right-click to flag</p>';
+      area.innerHTML = html;
+    }
+    window.oasisMSReveal = (r, c) => {
+      if (over || revealed[r][c] || flagged[r][c]) return;
+      if (!started) { placeMines(r, c); started = true; }
+      if (board[r][c] === -1) { over = true; for (let i = 0; i < ROWS; i++) for (let j = 0; j < COLS; j++) revealed[i][j] = true; render(); sendScore(0); showToast('Boom! Hit a mine!', 'error'); return; }
+      reveal(r, c);
+      if (checkWin()) { over = true; const pts = revealed.flat().filter(Boolean).length; render(); sendScore(pts); showToast(`Minesweeper cleared! ${pts} pts`, 'success'); return; }
+      render();
+    };
+    window.oasisMSFlag = (r, c) => { if (!over && !revealed[r][c]) { flagged[r][c] = !flagged[r][c]; render(); } };
+    render();
+    return () => { delete window.oasisMSReveal; delete window.oasisMSFlag; };
   }
 
-  // --- MATH RUSH ---
-  function initMath() {
-    $('#game-area').innerHTML = `
-      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Solve 10 problems. Most correct wins!</p>
-      <div class="math-display">
-        <div class="math-question" id="math-question">Loading...</div>
-        <div>
-          <input type="number" class="math-input" id="math-answer" onkeydown="if(event.key==='Enter')window.oasisMathSubmit()">
-          <button class="math-submit" onclick="window.oasisMathSubmit()">→</button>
-        </div>
-        <div id="math-scores" style="margin-top:1rem;color:var(--text2)"></div>
-      </div>
-    `;
-  }
-
-  window.oasisMathSubmit = () => {
-    const answer = parseInt($('#math-answer')?.value);
-    if (isNaN(answer)) return;
-    if (!currentRoom) return;
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, answer }));
-    const inp = $('#math-answer');
-    if (inp) { inp.value = ''; inp.focus(); }
-  };
-
-  function handleMathNew(msg) {
-    const q = $('#math-question');
-    if (q) q.textContent = msg.question;
-    const inp = $('#math-answer');
-    if (inp) inp.focus();
-  }
-
-  function handleMathResult(msg) {
-    const s = $('#math-scores');
-    if (s) s.textContent = `You: ${msg.scores[user.id] || 0} | Opponent: ${msg.scores[Object.keys(msg.scores).find(k => k !== user.id)] || 0} | Answer: ${msg.answer}`;
-  }
-
-  // --- STREET RACER ---
-  function initRacer() {
-    $('#game-area').innerHTML = `
-      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Race to 500m! Choose your move each turn.</p>
-      <div style="display:flex;justify-content:center;gap:1rem;margin-bottom:1.5rem">
-        <div style="width:200px;height:40px;background:var(--bg3);border-radius:20px;overflow:hidden;border:1px solid var(--border);position:relative">
-          <div id="racer-my-bar" style="height:100%;background:var(--green);width:0%;transition:width 0.5s;border-radius:20px"></div>
-          <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.8rem;font-family:var(--font-display)" id="racer-my-pos">0m</span>
-        </div>
-        <div style="width:200px;height:40px;background:var(--bg3);border-radius:20px;overflow:hidden;border:1px solid var(--border);position:relative">
-          <div id="racer-opp-bar" style="height:100%;background:var(--red);width:0%;transition:width 0.5s;border-radius:20px"></div>
-          <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:0.8rem;font-family:var(--font-display)" id="racer-opp-pos">0m</span>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:center;gap:1rem;flex-wrap:wrap">
-        <button class="btn-primary" style="width:auto;padding:0.8rem 2rem" onclick="window.oasisRacer('boost')">⚡ BOOST</button>
-        <button class="btn-secondary" style="width:auto;padding:0.8rem 2rem" onclick="window.oasisRacer('drift')">🔄 DRIFT</button>
-        <button class="btn-secondary" style="width:auto;padding:0.8rem 2rem" onclick="window.oasisRacer('slipstream')">💨 SLIPSTREAM</button>
-        <button class="btn-secondary" style="width:auto;padding:0.8rem 2rem" onclick="window.oasisRacer('ram')">💥 RAM</button>
-      </div>
-      <p id="racer-status" style="text-align:center;margin-top:1rem;color:var(--accent);font-family:var(--font-display)">Choose your move!</p>
-    `;
-  }
-
-  window.oasisRacer = (action) => {
-    if (!currentRoom) return;
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, action }));
-  };
-
-  function handleRacerUpdate(msg) {
-    const my = msg.state[user.id];
-    const opp = msg.state[Object.keys(msg.state).find(k => k !== user.id)];
-    const myBar = $('#racer-my-bar');
-    const oppBar = $('#racer-opp-bar');
-    if (myBar) myBar.style.width = `${Math.min(100, (my.pos / 500) * 100)}%`;
-    if (oppBar) oppBar.style.width = `${Math.min(100, (opp.pos / 500) * 100)}%`;
-    const myPos = $('#racer-my-pos');
-    const oppPos = $('#racer-opp-pos');
-    if (myPos) myPos.textContent = `${my.pos}m`;
-    if (oppPos) oppPos.textContent = `${opp.pos}m`;
-    const status = $('#racer-status');
-    if (status) status.textContent = msg.playerId === user.id ? `You ${msg.action}! +${msg.speed}m` : `Opponent ${msg.action}!`;
-  }
-
-  // --- BOXING ---
-  function initBoxing() {
-    $('#game-area').innerHTML = `
-      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Knockout your opponent! Manage your stamina.</p>
-      <div style="display:flex;justify-content:center;gap:3rem;margin-bottom:1.5rem">
-        <div style="text-align:center">
-          <p style="color:var(--green);font-family:var(--font-display);font-size:0.8rem">YOUR HP</p>
-          <div style="width:150px;height:20px;background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">
-            <div id="box-my-hp" style="height:100%;background:var(--green);width:100%;transition:width 0.3s"></div>
-          </div>
-          <p style="color:var(--blue);font-family:var(--font-display);font-size:0.7rem;margin-top:0.3rem">STAMINA: <span id="box-my-stam">100</span>%</p>
-        </div>
-        <div style="text-align:center">
-          <p style="color:var(--red);font-family:var(--font-display);font-size:0.8rem">OPP HP</p>
-          <div style="width:150px;height:20px;background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">
-            <div id="box-opp-hp" style="height:100%;background:var(--red);width:100%;transition:width 0.3s"></div>
-          </div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:center;gap:0.8rem;flex-wrap:wrap">
-        <button class="btn-primary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('jab')">👊 JAB</button>
-        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('hook')">🥊 HOOK</button>
-        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('uppercut')">⬆ UPPERCUT</button>
-        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('block')">🛡 BLOCK</button>
-        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisBox('dodge')">🔄 DODGE</button>
-      </div>
-      <p id="box-status" style="text-align:center;margin-top:1rem;color:var(--accent);font-family:var(--font-display)">Fight!</p>
-    `;
-  }
-
-  window.oasisBox = (punch) => {
-    if (!currentRoom) return;
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, punch }));
-  };
-
-  function handleBoxUpdate(msg) {
-    const my = msg.state[user.id];
-    const opp = msg.state[Object.keys(msg.state).find(k => k !== user.id)];
-    const myHp = $('#box-my-hp');
-    const oppHp = $('#box-opp-hp');
-    const myStam = $('#box-my-stam');
-    if (myHp) myHp.style.width = `${my.hp}%`;
-    if (oppHp) oppHp.style.width = `${opp.hp}%`;
-    if (myStam) myStam.textContent = my.stamina;
-    const status = $('#box-status');
-    if (status) status.textContent = msg.playerId === user.id ? `${msg.punch.toUpperCase()}! -${msg.dmg} HP` : `Opponent ${msg.punch}!`;
-  }
-
-  // --- STREET FIGHTER ---
-  function initStreetFighter() {
-    $('#game-area').innerHTML = `
-      <p style="text-align:center;color:var(--text2);margin-bottom:1rem">Choose your fighter moves! Build energy for specials.</p>
-      <div style="display:flex;justify-content:center;gap:3rem;margin-bottom:1.5rem">
-        <div style="text-align:center">
-          <p style="color:var(--green);font-family:var(--font-display);font-size:0.8rem">YOUR HP</p>
-          <div style="width:150px;height:20px;background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">
-            <div id="sf-my-hp" style="height:100%;background:var(--green);width:100%;transition:width 0.3s"></div>
-          </div>
-          <div style="width:150px;height:10px;background:var(--bg3);border-radius:5px;overflow:hidden;margin-top:4px;border:1px solid var(--border)">
-            <div id="sf-my-energy" style="height:100%;background:var(--accent);width:50%;transition:width 0.3s"></div>
-          </div>
-        </div>
-        <div style="text-align:center">
-          <p style="color:var(--red);font-family:var(--font-display);font-size:0.8rem">ENEMY HP</p>
-          <div style="width:150px;height:20px;background:var(--bg3);border-radius:10px;overflow:hidden;border:1px solid var(--border)">
-            <div id="sf-opp-hp" style="height:100%;background:var(--red);width:100%;transition:width 0.3s"></div>
-          </div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:center;gap:0.8rem;flex-wrap:wrap">
-        <button class="btn-primary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisSF('punch')">👊 PUNCH</button>
-        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisSF('kick')">🦵 KICK</button>
-        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem;position:relative" onclick="window.oasisSF('fireball')">🔥 FIREBALL <span style="font-size:0.6rem;color:var(--text-muted)">(30⚡)</span></button>
-        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem;position:relative" onclick="window.oasisSF('shoryuken')">🌀 SHORYUKEN <span style="font-size:0.6rem;color:var(--text-muted)">(40⚡)</span></button>
-        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisSF('block')">🛡 BLOCK</button>
-        <button class="btn-secondary" style="width:auto;padding:0.7rem 1.5rem" onclick="window.oasisSF('heal')">💚 HEAL</button>
-      </div>
-      <p id="sf-status" style="text-align:center;margin-top:1rem;color:var(--accent);font-family:var(--font-display)">FIGHT!</p>
-    `;
-  }
-
-  window.oasisSF = (move) => {
-    if (!currentRoom) return;
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, move }));
-  };
-
-  function handleSFUpdate(msg) {
-    const my = msg.state[user.id];
-    const opp = msg.state[Object.keys(msg.state).find(k => k !== user.id)];
-    const myHp = $('#sf-my-hp');
-    const myEnergy = $('#sf-my-energy');
-    const oppHp = $('#sf-opp-hp');
-    if (myHp) myHp.style.width = `${my.hp}%`;
-    if (myEnergy) myEnergy.style.width = `${my.energy}%`;
-    if (oppHp) oppHp.style.width = `${opp.hp}%`;
-    const status = $('#sf-status');
-    if (status) status.textContent = msg.playerId === user.id ? `${msg.move.toUpperCase()}! -${msg.dmg}` : `Enemy ${msg.move}!`;
-  }
-
-  // --- TETRIS CLASH ---
-  function initTetrisClash() {
-    const rows = 18, cols = 10;
-    let myBoard = Array.from({ length: rows }, () => Array(cols).fill(0));
-    let oppBoard = Array.from({ length: rows }, () => Array(cols).fill(0));
-    let currentPiece = null, nextPiece = null, score = 0, lines = 0;
-    const pieces = { I: [[1,1,1,1]], O: [[1,1],[1,1]], T: [[0,1,0],[1,1,1]], S: [[0,1,1],[1,1,0]], Z: [[1,1,0],[0,1,1]], J: [[1,0,0],[1,1,1]], L: [[0,0,1],[1,1,1]] };
-    let pieceX = 0, pieceY = 0, pieceKey = '', pieceShape = null;
-
+  // ==================== 9. TETRIS ====================
+  function gameTetris(area, sendScore) {
+    const ROWS = 18, COLS = 10;
+    let board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+    let score = 0, lines = 0, over = false;
+    const SHAPES = { I: [[1,1,1,1]], O: [[1,1],[1,1]], T: [[0,1,0],[1,1,1]], S: [[0,1,1],[1,1,0]], Z: [[1,1,0],[0,1,1]], J: [[1,0,0],[1,1,1]], L: [[0,0,1],[1,1,1]] };
+    let shape, sx, sy;
     function newPiece() {
-      const keys = Object.keys(pieces);
-      pieceKey = nextPiece || keys[Math.floor(Math.random() * keys.length)];
-      nextPiece = keys[Math.floor(Math.random() * keys.length)];
-      pieceShape = pieces[pieceKey];
-      pieceX = Math.floor((cols - pieceShape[0].length) / 2);
-      pieceY = 0;
-      renderTetris();
+      const keys = Object.keys(SHAPES);
+      shape = SHAPES[keys[Math.floor(Math.random() * keys.length)]];
+      sx = Math.floor((COLS - shape[0].length) / 2); sy = 0;
+      if (!canPlace(shape, sx, sy)) { over = true; sendScore(lines); showToast(`Tetris: ${lines} lines`, 'error'); }
     }
-
-    function canPlace(shape, px, py, board) {
-      for (let r = 0; r < shape.length; r++)
-        for (let c = 0; c < shape[r].length; c++)
-          if (shape[r][c]) {
-            const nx = px + c, ny = py + r;
-            if (nx < 0 || nx >= cols || ny >= rows) return false;
-            if (ny >= 0 && board[ny][nx]) return false;
-          }
-      return true;
-    }
-
-    function placePiece() {
-      for (let r = 0; r < pieceShape.length; r++)
-        for (let c = 0; c < pieceShape[r].length; c++)
-          if (pieceShape[r][c] && pieceY + r >= 0) myBoard[pieceY + r][pieceX + c] = 1;
-      clearLines();
+    function canPlace(s, px, py) { for (let r = 0; r < s.length; r++) for (let c = 0; c < s[r].length; c++) { if (s[r][c]) { const nx = px + c, ny = py + r; if (nx < 0 || nx >= COLS || ny >= ROWS) return false; if (ny >= 0 && board[ny][nx]) return false; } } return true; }
+    function place() {
+      for (let r = 0; r < shape.length; r++) for (let c = 0; c < shape[r].length; c++) if (shape[r][c] && sy + r >= 0) board[sy + r][sx + c] = 1;
+      let cleared = 0;
+      for (let r = ROWS - 1; r >= 0; r--) { if (board[r].every(c => c)) { board.splice(r, 1); board.unshift(Array(COLS).fill(0)); cleared++; r++; } }
+      if (cleared) { lines += cleared; score += cleared * cleared * 100; }
       newPiece();
-      if (!canPlace(pieceShape, pieceX, pieceY, myBoard)) {
-        ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, gameOver: true, linesCleared: 0 }));
-        showToast('Game Over!', 'error');
-        return;
-      }
     }
-
-    function clearLines() {
-      let cleared = 0;
-      for (let r = rows - 1; r >= 0; r--) {
-        if (myBoard[r].every(c => c)) {
-          myBoard.splice(r, 1);
-          myBoard.unshift(Array(cols).fill(0));
-          cleared++;
-          r++;
-        }
-      }
-      if (cleared > 0) {
-        lines += cleared;
-        score += cleared * cleared * 100;
-        ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, linesCleared: cleared, gameOver: false }));
-      }
-    }
-
-    function renderTetris() {
-      const area = $('#game-area');
-      let html = `<p style="text-align:center;color:var(--text2);margin-bottom:0.5rem">Score: <span style="color:var(--accent);font-family:var(--font-display)">${score}</span> | Lines: <span style="color:var(--accent)">${lines}</span></p>`;
-      html += '<div style="display:flex;justify-content:center;gap:2rem">';
-      html += '<div style="text-align:center"><p style="font-size:0.7rem;color:var(--text-muted);margin-bottom:0.3rem">YOU</p>';
-      html += '<div style="display:inline-grid;grid-template-columns:repeat(10,24px);gap:1px;background:var(--bg3);padding:2px;border:1px solid var(--border);border-radius:4px">';
-      const showBoard = myBoard.map(r => [...r]);
-      if (pieceShape) {
-        for (let r = 0; r < pieceShape.length; r++)
-          for (let c = 0; c < pieceShape[r].length; c++)
-            if (pieceShape[r][c] && pieceY + r >= 0 && pieceY + r < rows) showBoard[pieceY + r][pieceX + c] = 2;
-      }
-      for (let r = 0; r < rows; r++)
-        for (let c = 0; c < cols; c++) {
-          const v = showBoard[r][c];
-          html += `<div style="width:24px;height:24px;border-radius:2px;background:${v === 2 ? 'var(--accent)' : v ? 'var(--blue)' : 'var(--surface)'}"></div>`;
-        }
-      html += '</div></div>';
+    function render() {
+      const show = board.map(r => [...r]);
+      if (shape) for (let r = 0; r < shape.length; r++) for (let c = 0; c < shape[r].length; c++) if (shape[r][c] && sy + r >= 0 && sy + r < ROWS) show[sy + r][sx + c] = 2;
+      let html = `<p style="text-align:center;color:var(--text2);margin-bottom:0.3rem">Lines: <b style="color:var(--accent)">${lines}</b> | Score: <b style="color:var(--accent)">${score}</b></p>`;
+      html += '<div style="display:inline-grid;grid-template-columns:repeat(10,24px);gap:1px;background:var(--bg3);padding:3px;border:1px solid var(--border);border-radius:4px;margin:0 auto;display:block;width:fit-content">';
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { const v = show[r][c]; html += `<div style="width:24px;height:24px;border-radius:2px;background:${v === 2 ? 'var(--accent)' : v ? '#4488ff' : 'var(--surface)'}"></div>`; }
       html += '</div>';
-      html += '<div style="text-align:center;margin-top:1rem;display:flex;justify-content:center;gap:0.5rem">';
-      html += '<button class="btn-secondary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetris(\'left\')">◀</button>';
-      html += '<button class="btn-primary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetris(\'rotate\')">↻</button>';
-      html += '<button class="btn-secondary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetris(\'right\')">▶</button>';
-      html += '<button class="btn-primary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetris(\'drop\')">⬇ DROP</button>';
+      html += '<div style="text-align:center;margin-top:0.8rem;display:flex;justify-content:center;gap:0.4rem">';
+      html += '<button class="btn-secondary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetrisMove(\'left\')">◀</button>';
+      html += '<button class="btn-primary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetrisMove(\'rotate\')">↻</button>';
+      html += '<button class="btn-secondary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetrisMove(\'right\')">▶</button>';
+      html += '<button class="btn-primary" style="width:auto;padding:0.5rem 1rem" onclick="window.oasisTetrisMove(\'drop\')">DROP</button>';
       html += '</div>';
       area.innerHTML = html;
     }
-
-    window.oasisTetris = (action) => {
-      switch (action) {
-        case 'left': if (canPlace(pieceShape, pieceX - 1, pieceY, myBoard)) pieceX--; break;
-        case 'right': if (canPlace(pieceShape, pieceX + 1, pieceY, myBoard)) pieceX++; break;
-        case 'rotate': {
-          const rotated = pieceShape[0].map((_, i) => pieceShape.map(row => row[i]).reverse());
-          if (canPlace(rotated, pieceX, pieceY, myBoard)) pieceShape = rotated;
-          break;
-        }
-        case 'drop':
-          while (canPlace(pieceShape, pieceX, pieceY + 1, myBoard)) pieceY++;
-          placePiece();
-          return;
-      }
-      renderTetris();
+    window.oasisTetrisMove = (a) => {
+      if (over) return;
+      if (a === 'left' && canPlace(shape, sx - 1, sy)) sx--;
+      else if (a === 'right' && canPlace(shape, sx + 1, sy)) sx++;
+      else if (a === 'rotate') { const rot = shape[0].map((_, i) => shape.map(row => row[i]).reverse()); if (canPlace(rot, sx, sy)) shape = rot; }
+      else if (a === 'drop') { while (canPlace(shape, sx, sy + 1, board)) sy++; place(); }
+      render();
     };
-
-    window.oasisTetrisGarbage = (penalty) => {
-      if (penalty > 0) {
-        for (let i = 0; i < penalty; i++) {
-          myBoard.shift();
-          const gap = Math.floor(Math.random() * cols);
-          myBoard.push(Array(cols).fill(1).map((v, idx) => idx === gap ? 0 : 1));
-        }
-        renderTetris();
-      }
-    };
-
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, type: 'tetris_init' }));
-    newPiece();
-
-    window.tetrisInterval = setInterval(() => {
-      if (canPlace(pieceShape, pieceX, pieceY + 1, myBoard)) { pieceY++; renderTetris(); }
-      else placePiece();
-    }, 800);
+    const kHandler = (e) => { const m = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'rotate', ArrowDown: 'drop' }; if (m[e.key]) { e.preventDefault(); window.oasisTetrisMove(m[e.key]); } };
+    document.addEventListener('keydown', kHandler);
+    newPiece(); render();
+    const dropLoop = setInterval(() => { if (!over) { if (canPlace(shape, sx, sy + 1)) sy++; else place(); render(); } }, 800);
+    return () => { clearInterval(dropLoop); document.removeEventListener('keydown', kHandler); delete window.oasisTetrisMove; };
   }
 
-  function handleTetrisGarbage(msg) {
-    if (msg.playerId !== user.id && msg.penalty > 0 && window.oasisTetrisGarbage) {
-      window.oasisTetrisGarbage(msg.penalty);
+  // ==================== 10. BUBBLE SHOOTER ====================
+  function gameBubbleShooter(area, sendScore) {
+    const W = 360, H = 500;
+    const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.style.cssText = 'display:block;margin:0 auto;border-radius:12px;border:2px solid var(--border)';
+    area.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    const COLS = 8, R = 18, ROWS_TOP = 6;
+    const COLORS = ['#ff4444', '#44ff44', '#4444ff', '#ffcc00', '#ff44ff'];
+    let grid = [], score = 0, over = false;
+    for (let r = 0; r < ROWS_TOP; r++) { const row = []; for (let c = 0; c < COLS; c++) row.push(COLORS[Math.floor(Math.random() * COLORS.length)]); grid.push(row); }
+    let aimX = W / 2, aimY = H, shooter = { color: COLORS[Math.floor(Math.random() * COLORS.length)], next: COLORS[Math.floor(Math.random() * COLORS.length)] };
+    let flying = null;
+
+    function getPos(r, c) { const x = c * R * 2 + R + (r % 2 ? R : 0); const y = r * R * 1.73 + R; return { x, y }; }
+
+    function shoot() {
+      if (flying || over) return;
+      const dx = aimX - W / 2, dy = aimY - H;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      flying = { x: W / 2, y: H, vx: dx / len * 8, vy: dy / len * 8, color: shooter.color };
+      shooter.color = shooter.next;
+      shooter.next = COLORS[Math.floor(Math.random() * COLORS.length)];
     }
+
+    function tick() {
+      if (over || !flying) return;
+      flying.x += flying.vx; flying.y += flying.vy;
+      if (flying.x < R || flying.x > W - R) flying.vx *= -1;
+      if (flying.y < R) { land(flying); flying = null; return; }
+      grid.forEach((row, r) => row.forEach((cell, c) => {
+        if (!cell || !flying) return;
+        const p = getPos(r, c);
+        if (Math.hypot(flying.x - p.x, flying.y - p.y) < R * 1.8) { land(flying); flying = null; }
+      }));
+    }
+
+    function land(b) {
+      let bestR = 0, bestC = 0, bestD = Infinity;
+      grid.forEach((row, r) => row.forEach((cell, c) => {
+        if (cell) return;
+        const p = getPos(r, c);
+        const d = Math.hypot(b.x - p.x, b.y - p.y);
+        if (d < bestD) { bestD = d; bestR = r; bestC = c; }
+      }));
+      while (grid.length <= bestR) grid.push(Array(COLS).fill(null));
+      grid[bestR][bestC] = b.color;
+      checkMatches(bestR, bestC, b.color);
+      if (grid.flat().filter(Boolean).length === 0) { over = true; score += 500; sendScore(score); showToast(`Bubble Shooter: Perfect clear! ${score} pts`, 'success'); }
+    }
+
+    function checkMatches(r, c, color) {
+      const matches = [];
+      const visited = new Set();
+      function flood(cr, cc) {
+        const key = `${cr},${cc}`;
+        if (visited.has(key) || cr < 0 || cr >= grid.length || cc < 0 || cc >= COLS) return;
+        if (grid[cr]?.[cc] !== color) return;
+        visited.add(key);
+        matches.push([cr, cc]);
+        flood(cr - 1, cc); flood(cr + 1, cc); flood(cr, cc - 1); flood(cr, cc + 1);
+      }
+      flood(r, c);
+      if (matches.length >= 3) { score += matches.length * 50; matches.forEach(([mr, mc]) => { if (grid[mr]) grid[mr][mc] = null; }); }
+    }
+
+    cvs.addEventListener('pointermove', (e) => { const rect = cvs.getBoundingClientRect(); aimX = (e.clientX - rect.left) * (W / rect.width); });
+    cvs.addEventListener('pointerup', shoot);
+
+    function render() {
+      ctx.fillStyle = '#0a0a2e'; ctx.fillRect(0, 0, W, H);
+      grid.forEach((row, r) => row.forEach((cell, c) => {
+        if (!cell) return;
+        const p = getPos(r, c);
+        ctx.fillStyle = cell; ctx.beginPath(); ctx.arc(p.x, p.y, R - 2, 0, Math.PI * 2); ctx.fill();
+      }));
+      if (flying) { ctx.fillStyle = flying.color; ctx.beginPath(); ctx.arc(flying.x, flying.y, R - 2, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = shooter.color; ctx.beginPath(); ctx.arc(W / 2, H - 20, R, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#555'; ctx.fillRect(W / 2 - 2, H - 60, 4, 40);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 14px Orbitron,sans-serif'; ctx.fillText(`Score: ${score}`, 8, 18);
+    }
+
+    const loop = setInterval(() => { tick(); render(); }, 1000 / 60);
+    return () => clearInterval(loop);
   }
 
-  // --- BLOCK PUZZLE ---
-  function initBlockPuzzle() {
-    const rows = 8, cols = 8;
-    let board = Array.from({ length: rows }, () => Array(cols).fill(0));
-    let score = 0, totalRows = 0;
-    let currentBlocks = [];
+  // ==================== 11. DOODLE JUMP ====================
+  function gameDoodleJump(area, sendScore) {
+    const W = 320, H = 480;
+    const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.style.cssText = 'display:block;margin:0 auto;border-radius:12px;border:2px solid var(--border)';
+    area.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    let duder = { x: W / 2, y: H - 60, vx: 0 }, platforms = [], score = 0, over = false, maxHeight = 0;
+    for (let i = 0; i < 8; i++) platforms.push({ x: Math.random() * (W - 50), y: H - 60 - i * 60, w: 55, type: Math.random() < 0.15 ? 'moving' : 'static' });
+    let keys = {};
+    const kDown = (e) => { keys[e.code] = true; };
+    const kUp = (e) => { keys[e.code] = false; };
+    document.addEventListener('keydown', kDown);
+    document.addEventListener('keyup', kUp);
 
-    const blockShapes = [
-      [[1]], [[1,1]], [[1,1,1]], [[1,1,1,1]],
-      [[1,1],[1,1]], [[1,0],[1,1]], [[0,1],[1,1]],
-      [[1,1,0],[0,1,1]], [[0,1,1],[1,1,0]]
-    ];
+    let jumpVy = -10;
+    duder.vy = jumpVy;
 
-    function newBlocks() {
-      currentBlocks = [];
-      for (let i = 0; i < 3; i++) {
-        currentBlocks.push(blockShapes[Math.floor(Math.random() * blockShapes.length)]);
-      }
-      renderBlock();
-    }
+    function tick() {
+      if (over) return;
+      if (keys['ArrowLeft'] || keys['KeyA']) duder.vx = -4;
+      else if (keys['ArrowRight'] || keys['KeyD']) duder.vx = 4;
+      else duder.vx *= 0.9;
 
-    function canPlaceBlock(shape, px, py) {
-      for (let r = 0; r < shape.length; r++)
-        for (let c = 0; c < shape[r].length; c++)
-          if (shape[r][c]) {
-            const nx = px + c, ny = py + r;
-            if (nx < 0 || nx >= cols || ny < 0 || ny >= rows || board[ny][nx]) return false;
+      duder.x += duder.vx;
+      duder.vy += 0.4;
+      duder.y += duder.vy;
+
+      if (duder.x < 0) duder.x = W;
+      if (duder.x > W) duder.x = 0;
+
+      platforms.forEach(p => { if (p.type === 'moving') p.x += (Math.sin(Date.now() / 500 + p.y) * 1.5); });
+
+      if (duder.vy > 0) {
+        platforms.forEach(p => {
+          if (duder.x + 20 > p.x && duder.x < p.x + p.w && duder.y + 30 > p.y && duder.y + 30 < p.y + 15) {
+            duder.vy = jumpVy;
           }
-      return true;
-    }
-
-    function placeBlock(idx, px, py) {
-      const shape = currentBlocks[idx];
-      if (!shape || !canPlaceBlock(shape, px, py)) return;
-      for (let r = 0; r < shape.length; r++)
-        for (let c = 0; c < shape[r].length; c++)
-          if (shape[r][c]) board[py + r][px + c] = 1;
-      currentBlocks.splice(idx, 1);
-      clearBlockRows();
-      if (currentBlocks.length === 0) newBlocks();
-      renderBlock();
-      checkBlockGameOver();
-    }
-
-    function clearBlockRows() {
-      let cleared = 0;
-      for (let r = rows - 1; r >= 0; r--) {
-        if (board[r].every(c => c)) {
-          board.splice(r, 1);
-          board.unshift(Array(cols).fill(0));
-          cleared++;
-          r++;
-        }
+        });
       }
-      for (let c = cols - 1; c >= 0; c--) {
-        if (board.every(r => r[c])) {
-          board.forEach(r => r.splice(c, 1));
-          board.forEach(r => r.unshift(0));
-          cleared++;
-          c++;
-        }
+
+      const scrollThreshold = H * 0.4;
+      if (duder.y < scrollThreshold) {
+        const diff = scrollThreshold - duder.y;
+        duder.y = scrollThreshold;
+        platforms.forEach(p => p.y += diff);
+        score += Math.floor(diff);
       }
-      if (cleared > 0) {
-        const pts = cleared === 1 ? 100 : cleared === 2 ? 300 : cleared === 3 ? 500 : 800;
-        score += pts;
-        totalRows += cleared;
-        ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, rowsCleared: cleared, gameOver: false }));
+
+      platforms = platforms.filter(p => p.y < H + 50);
+      while (platforms.length < 8) {
+        const topY = Math.min(...platforms.map(p => p.y));
+        platforms.push({ x: Math.random() * (W - 50), y: topY - 50 - Math.random() * 30, w: 55, type: Math.random() < 0.15 ? 'moving' : 'static' });
       }
+
+      if (duder.y > H) { over = true; sendScore(score); showToast(`Doodle Jump: ${score} height!`, 'success'); }
+
+      ctx.fillStyle = '#e8f4e8'; ctx.fillRect(0, 0, W, H);
+      platforms.forEach(p => { ctx.fillStyle = p.type === 'moving' ? '#ff8844' : '#44aa44'; ctx.fillRect(p.x, p.y, p.w, 10); });
+      ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(duder.x + 10, duder.y + 10, 12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(duder.x + 6, duder.y + 7, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(duder.x + 14, duder.y + 7, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#333'; ctx.font = 'bold 14px Orbitron,sans-serif'; ctx.fillText(`Height: ${score}`, 8, 18);
     }
-
-    function checkBlockGameOver() {
-      for (const block of currentBlocks) {
-        for (let r = 0; r < rows; r++)
-          for (let c = 0; c < cols; c++)
-            if (canPlaceBlock(block, c, r)) return;
-      }
-      ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, gameOver: true, rowsCleared: 0 }));
-      showToast('No moves left! Game Over.', 'error');
-    }
-
-    function renderBlock() {
-      const area = $('#game-area');
-      let html = `<p style="text-align:center;color:var(--text2);margin-bottom:0.5rem">Score: <span style="color:var(--accent);font-family:var(--font-display)">${score}</span></p>`;
-      html += '<div style="display:flex;justify-content:center;gap:2rem;align-items:start">';
-      html += '<div style="display:inline-grid;grid-template-columns:repeat(8,32px);gap:1px;background:var(--bg3);padding:2px;border:1px solid var(--border);border-radius:4px">';
-      for (let r = 0; r < rows; r++)
-        for (let c = 0; c < cols; c++)
-          html += `<div data-br="${r}" data-bc="${c}" style="width:32px;height:32px;border-radius:2px;background:${board[r][c] ? 'var(--accent)' : 'var(--surface)'};cursor:pointer" onclick="window.oasisBlockPlace(${r},${c})"></div>`;
-      html += '</div>';
-      html += '<div style="display:flex;flex-direction:column;gap:0.5rem">';
-      html += '<p style="font-size:0.7rem;color:var(--text-muted)">BLOCKS</p>';
-      currentBlocks.forEach((block, idx) => {
-        html += `<div style="display:inline-grid;grid-template-columns:repeat(${block[0].length},16px);gap:1px;background:var(--bg3);padding:4px;border:1px solid var(--border);border-radius:4px;cursor:pointer" onclick="window.oasisBlockSelect(${idx})">`;
-        for (let r = 0; r < block.length; r++)
-          for (let c = 0; c < block[r].length; c++)
-            html += `<div style="width:16px;height:16px;border-radius:2px;background:${block[r][c] ? 'var(--blue)' : 'transparent'}"></div>`;
-        html += '</div>';
-      });
-      html += '</div></div>';
-      area.innerHTML = html;
-    }
-
-    let selectedBlock = null;
-    window.oasisBlockSelect = (idx) => { selectedBlock = idx; showToast('Tap a cell on the board to place', ''); };
-    window.oasisBlockPlace = (r, c) => { if (selectedBlock !== null) { placeBlock(selectedBlock, c, r); selectedBlock = null; } };
-
-    ws.send(JSON.stringify({ type: 'game_move', roomId: currentRoom, type: 'block_init' }));
-    newBlocks();
-  }
-
-  function handleBlockPenalty(msg) {
-    if (msg.playerId !== user.id) showToast(`Opponent cleared ${msg.rows} rows!`, 'error');
+    const loop = setInterval(tick, 1000 / 60);
+    return () => { clearInterval(loop); document.removeEventListener('keydown', kDown); document.removeEventListener('keyup', kUp); };
   }
 
   // ===================== WALLET =====================

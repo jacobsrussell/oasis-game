@@ -270,17 +270,17 @@ app.post('/api/withdraw', authMiddleware, (req, res) => {
 
 // ===================== GAMES =====================
 const GAMES = [
-  { id: 'tic-tac-toe', name: 'Tic Tac Toe', icon: '⭕', minBet: 10, maxBet: 5000, players: 2, desc: 'Classic noughts and crosses. Get 3 in a row to win!' },
-  { id: 'rps', name: 'Rock Paper Scissors', icon: '✊', minBet: 10, maxBet: 5000, players: 2, desc: 'Best of 3. Rock crushes Scissors, Scissors cuts Paper, Paper covers Rock.' },
-  { id: 'higher-lower', name: 'Higher or Lower', icon: '🃏', minBet: 10, maxBet: 10000, players: 2, desc: 'Guess if the next card is higher or lower. Most correct wins.' },
-  { id: 'dice-duel', name: 'Dice Duel', icon: '🎲', minBet: 10, maxBet: 5000, players: 2, desc: 'Roll the dice. Highest total after 3 rolls wins!' },
-  { id: 'memory-match', name: 'Memory Match', icon: '🧠', minBet: 10, maxBet: 5000, players: 2, desc: 'Find matching pairs. Most pairs found wins!' },
-  { id: 'math-rush', name: 'Math Rush', icon: '🔢', minBet: 10, maxBet: 5000, players: 2, desc: 'Solve math problems fastest. Most correct answers wins!' },
-  { id: 'street-racer', name: 'Street Racer', icon: '🏎️', minBet: 10, maxBet: 10000, players: 2, desc: 'High-speed street racing! Dodge traffic and outpace your rival to the finish line.' },
-  { id: 'boxing-ring', name: 'Boxing Ring', icon: '🥊', minBet: 10, maxBet: 10000, players: 2, desc: 'Step into the ring! Jab, hook, and uppercut your way to victory. Knockout wins the pot!' },
-  { id: 'street-fighter', name: 'Street Fighter', icon: '🐉', minBet: 10, maxBet: 10000, players: 2, desc: 'Choose your fighter and battle! Execute combos and special moves to defeat your opponent.' },
-  { id: 'tetris-clash', name: 'Tetris Clash', icon: '🧱', minBet: 10, maxBet: 5000, players: 2, desc: 'Race to clear lines! Send garbage blocks to your opponent. Last one standing wins!' },
-  { id: 'block-puzzle', name: 'Block Puzzle', icon: '🟦', minBet: 10, maxBet: 5000, players: 2, desc: 'Fit blocks on the board and clear rows. Most points wins the showdown!' }
+  { id: 'flappy-bird', name: 'Flappy Bird', icon: '🐦', minBet: 10, maxBet: 5000, players: 2, desc: 'Tap to flap and dodge pipes! Highest score wins!' },
+  { id: '2048', name: '2048', icon: '🔢', minBet: 10, maxBet: 5000, players: 2, desc: 'Slide tiles to merge numbers. Reach the highest tile!' },
+  { id: 'snake', name: 'Snake', icon: '🐍', minBet: 10, maxBet: 5000, players: 2, desc: 'Eat, grow, survive! Longest snake wins!' },
+  { id: 'connect-4', name: 'Connect 4', icon: '🔴', minBet: 10, maxBet: 5000, players: 2, desc: 'Drop discs to get 4 in a row. Classic strategy!' },
+  { id: 'breakout', name: 'Breakout', icon: '🧱', minBet: 10, maxBet: 5000, players: 2, desc: 'Smash bricks with your ball! Most bricks broken wins!' },
+  { id: 'space-invaders', name: 'Space Invaders', icon: '👾', minBet: 10, maxBet: 5000, players: 2, desc: 'Defend Earth! Highest alien score wins!' },
+  { id: 'whack-a-mole', name: 'Whack-a-Mole', icon: '🔨', minBet: 10, maxBet: 5000, players: 2, desc: 'Quick! Whack the moles! Most hits in 30s wins!' },
+  { id: 'minesweeper', name: 'Minesweeper', icon: '💣', minBet: 10, maxBet: 5000, players: 2, desc: 'Clear the minefield! Most safe cells cleared wins!' },
+  { id: 'tetris', name: 'Tetris', icon: '📦', minBet: 10, maxBet: 5000, players: 2, desc: 'Clear lines! Most lines cleared wins!' },
+  { id: 'bubble-shooter', name: 'Bubble Shooter', icon: '🫧', minBet: 10, maxBet: 5000, players: 2, desc: 'Match and pop bubbles! Highest score wins!' },
+  { id: 'doodle-jump', name: 'Doodle Jump', icon: '📈', minBet: 10, maxBet: 5000, players: 2, desc: 'Jump higher and higher! Highest altitude wins!' }
 ];
 
 app.get('/api/games', authMiddleware, (req, res) => res.json({ games: GAMES }));
@@ -655,6 +655,18 @@ wss.on('connection', (ws, req) => {
         processGameMove(room, userId, msg);
       }
 
+      if (msg.type === 'game_score') {
+        const room = activeRooms[msg.roomId];
+        if (!room || !room.players.includes(userId)) return;
+        handleGameScore(room, userId, msg);
+      }
+
+      if (msg.type === 'game_c4') {
+        const room = activeRooms[msg.roomId];
+        if (!room || !room.players.includes(userId)) return;
+        handleConnect4(room, userId, msg);
+      }
+
       if (msg.type === 'chat') {
         const user = findUser({ id: userId });
         wss.clients.forEach(client => {
@@ -685,435 +697,134 @@ function broadcastOnlineCount() {
 }
 
 // ===================== GAME ENGINES =====================
-function processGameMove(room, userId, msg) {
+
+function handleGameScore(room, userId, msg) {
+  if (!room.scores) room.scores = {};
+  if (room.scores[userId] !== undefined) return;
+  room.scores[userId] = msg.score || 0;
+
+  if (room.freePlay) {
+    const botScore = generateBotScore(room.gameId);
+    room.scores[BOT_ID] = botScore;
+    const won = (msg.score || 0) > botScore;
+    const draw = (msg.score || 0) === botScore;
+    endMatch(room, draw ? null : (won ? userId : BOT_ID));
+  } else {
+    const p1 = room.players[0], p2 = room.players[1];
+    if (room.scores[p1] !== undefined && room.scores[p2] !== undefined) {
+      const s1 = room.scores[p1], s2 = room.scores[p2];
+      endMatch(room, s1 > s2 ? p1 : s2 > s1 ? p2 : null);
+    } else {
+      const opp = room.players.find(p => p !== userId);
+      broadcastToUser(opp, { type: 'opponent_scored', roomId: room.id });
+    }
+  }
+}
+
+function handleConnect4(room, userId, msg) {
+  if (!room.c4Board) {
+    room.c4Board = Array(6).fill(null).map(() => Array(7).fill(0));
+    room.c4Turn = 0;
+  }
+  if (room.freePlay && room.c4Turn % 2 === 1) {
+    const col = botC4Move(room);
+    if (col === undefined) return;
+    let row = 5;
+    while (row >= 0 && room.c4Board[row][col] !== 0) row--;
+    room.c4Board[row][col] = 2;
+    room.c4Turn++;
+    const win = checkC4Win(room.c4Board, 2);
+    broadcastToUser(userId, { type: 'c4_update', board: room.c4Board, lastMove: { row, col, mark: 2 }, yourTurn: true, win: !!win });
+    if (win) endMatch(room, BOT_ID);
+    else if (room.c4Turn >= 42) endMatch(room, null);
+    return;
+  }
+
   const pIdx = room.players.indexOf(userId);
-  if (pIdx === -1) return;
-  const oppId = room.players[1 - pIdx];
+  if (room.c4Turn % 2 !== pIdx) return;
+  const col = msg.col;
+  if (col === undefined || col < 0 || col > 6 || room.c4Board[0][col] !== 0) return;
 
-  switch (room.gameId) {
-    case 'tic-tac-toe':
-      handleTicTacToe(room, userId, oppId, msg);
-      break;
-    case 'rps':
-      handleRPS(room, userId, oppId, msg);
-      break;
-    case 'higher-lower':
-      handleHigherLower(room, userId, oppId, msg);
-      break;
-    case 'dice-duel':
-      handleDiceDuel(room, userId, oppId, msg);
-      break;
-    case 'memory-match':
-      handleMemoryMatch(room, userId, oppId, msg);
-      break;
-    case 'math-rush':
-      handleMathRush(room, userId, oppId, msg);
-      break;
-    case 'street-racer':
-      handleStreetRacer(room, userId, oppId, msg);
-      break;
-    case 'boxing-ring':
-      handleBoxing(room, userId, oppId, msg);
-      break;
-    case 'street-fighter':
-      handleStreetFighter(room, userId, oppId, msg);
-      break;
-    case 'tetris-clash':
-      handleTetrisClash(room, userId, oppId, msg);
-      break;
-    case 'block-puzzle':
-      handleBlockPuzzle(room, userId, oppId, msg);
-      break;
-  }
+  let row = 5;
+  while (row >= 0 && room.c4Board[row][col] !== 0) row--;
+  const mark = pIdx + 1;
+  room.c4Board[row][col] = mark;
+  room.c4Turn++;
 
-  if (room.freePlay && room.status === 'playing' && userId !== BOT_ID && room.players.includes(BOT_ID) && !room._botPending && room.gameId !== 'tetris-clash' && room.gameId !== 'block-puzzle') {
-    room._botPending = true;
-    setTimeout(() => { room._botPending = false; }, 300);
-    botMove(room);
-  }
-}
+  const win = checkC4Win(room.c4Board, mark);
+  broadcastToUser(userId, { type: 'c4_update', board: room.c4Board, lastMove: { row, col, mark }, yourTurn: false, win: !!win });
 
-function handleTicTacToe(room, userId, oppId, msg) {
-  if (!room.board) { room.board = Array(9).fill(null); room.turn = 0; room.scores = { [room.players[0]]: 0, [room.players[1]]: 0 }; }
-  if (room.players[room.turn % 2] !== userId) return;
-  const cell = parseInt(msg.cell);
-  if (isNaN(cell) || cell < 0 || cell > 8 || room.board[cell]) return;
-
-  room.board[cell] = room.turn % 2 === 0 ? 'X' : 'O';
-  room.turn++;
-
-  const winner = checkTicTacToe(room.board);
-  if (winner || room.turn === 9) {
-    const p1 = room.players[0], p2 = room.players[1];
-    if (winner === 'X') room.scores[p1]++;
-    else if (winner === 'O') room.scores[p2]++;
-
-    if (room.scores[p1] >= 2 || room.scores[p2] >= 2 || room.turn === 9) {
-      endMatch(room, room.scores[p1] > room.scores[p2] ? p1 : room.scores[p2] > room.scores[p1] ? p2 : null);
-    } else {
-      room.board = Array(9).fill(null);
-      room.turn = 0;
-      broadcastToUser(userId, { type: 'game_update', roomId: room.id, board: room.board, scores: room.scores, nextTurn: true, message: `Round ${room.scores[p1] + room.scores[p2] + 1}` });
-      broadcastToUser(oppId, { type: 'game_update', roomId: room.id, board: room.board, scores: room.scores, nextTurn: false, message: `Round ${room.scores[p1] + room.scores[p2] + 1}` });
-    }
+  if (room.freePlay) {
+    setTimeout(() => {
+      if (room.c4Board && room.c4Turn % 2 === 1 && !win) {
+        const bc = botC4Move(room);
+        if (bc !== undefined) {
+          let br = 5;
+          while (br >= 0 && room.c4Board[br][bc] !== 0) br--;
+          room.c4Board[br][bc] = 2;
+          room.c4Turn++;
+          const bwin = checkC4Win(room.c4Board, 2);
+          broadcastToUser(userId, { type: 'c4_update', board: room.c4Board, lastMove: { row: br, col: bc, mark: 2 }, yourTurn: true, win: !!bwin });
+          if (bwin) endMatch(room, BOT_ID);
+          else if (room.c4Turn >= 42) endMatch(room, null);
+        }
+      }
+    }, 800);
   } else {
-    broadcastToUser(userId, { type: 'game_update', roomId: room.id, board: room.board, cell, mark: room.board[cell], nextTurn: false });
-    broadcastToUser(oppId, { type: 'game_update', roomId: room.id, board: room.board, cell, mark: room.board[cell], nextTurn: true });
+    const opp = room.players.find(p => p !== userId);
+    broadcastToUser(opp, { type: 'c4_update', board: room.c4Board, lastMove: { row, col, mark }, yourTurn: true, win: !!win });
+    if (win) endMatch(room, userId);
+    else if (room.c4Turn >= 42) endMatch(room, null);
   }
 }
 
-function checkTicTacToe(b) {
-  const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-  for (const [a,c,d] of lines) { if (b[a] && b[a] === b[c] && b[a] === b[d]) return b[a]; }
-  return null;
-}
-
-function handleRPS(room, userId, oppId, msg) {
-  if (!room.moves) room.moves = {};
-  if (!room.rpsRound) room.rpsRound = 1;
-  if (!room.rpsScores) room.rpsScores = { [room.players[0]]: 0, [room.players[1]]: 0 };
-
-  const move = msg.move;
-  if (!['rock', 'paper', 'scissors'].includes(move)) return;
-  room.moves[userId] = move;
-
-  if (room.moves[oppId]) {
-    const m1 = room.moves[room.players[0]];
-    const m2 = room.moves[room.players[1]];
-    let winner = null;
-    if (m1 === m2) winner = 'draw';
-    else if ((m1 === 'rock' && m2 === 'scissors') || (m1 === 'paper' && m2 === 'rock') || (m1 === 'scissors' && m2 === 'paper')) winner = room.players[0];
-    else winner = room.players[1];
-
-    if (winner !== 'draw') room.rpsScores[winner]++;
-    room.rpsRound++;
-    room.moves = {};
-
-    if (room.rpsScores[room.players[0]] >= 2 || room.rpsScores[room.players[1]] >= 2 || room.rpsRound > 3) {
-      const p1Score = room.rpsScores[room.players[0]];
-      const p2Score = room.rpsScores[room.players[1]];
-      endMatch(room, p1Score > p2Score ? room.players[0] : p2Score > p1Score ? room.players[1] : null);
-    } else {
-      broadcastToUser(userId, { type: 'rps_result', roomId: room.id, move1: m1, move2: m2, round: room.rpsRound - 1, scores: room.rpsScores, nextRound: true });
-      broadcastToUser(oppId, { type: 'rps_result', roomId: room.id, move1: m1, move2: m2, round: room.rpsRound - 1, scores: room.rpsScores, nextRound: true });
-    }
-  } else {
-    broadcastToUser(oppId, { type: 'rps_waiting', roomId: room.id });
-  }
-}
-
-function handleHigherLower(room, userId, oppId, msg) {
-  if (!room.hlDeck) {
-    room.hlDeck = shuffleDeck();
-    room.hlScores = { [room.players[0]]: 0, [room.players[1]]: 0 };
-    room.hlTurn = 0;
-    room.hlCurrent = room.hlDeck.pop();
-    room.hlRound = 0;
-  }
-
-  if (room.players[room.hlTurn % 2] !== userId) return;
-
-  const guess = msg.guess;
-  if (!['higher', 'lower'].includes(guess)) return;
-
-  const nextCard = room.hlDeck.pop();
-  const correct = (guess === 'higher' && nextCard.value > room.hlCurrent.value) || (guess === 'lower' && nextCard.value < room.hlCurrent.value);
-  if (correct) room.hlScores[userId]++;
-  room.hlCurrent = nextCard;
-  room.hlRound++;
-  room.hlTurn++;
-
-  broadcastToUser(userId, { type: 'hl_update', roomId: room.id, card: nextCard, correct, scores: room.hlScores, round: room.hlRound });
-  broadcastToUser(oppId, { type: 'hl_update', roomId: room.id, card: nextCard, correct, scores: room.hlScores, round: room.hlRound });
-
-  if (room.hlRound >= 10) {
-    const p1s = room.hlScores[room.players[0]];
-    const p2s = room.hlScores[room.players[1]];
-    endMatch(room, p1s > p2s ? room.players[0] : p2s > p1s ? room.players[1] : null);
-  }
-}
-
-function handleDiceDuel(room, userId, oppId, msg) {
-  if (!room.diceRolls) { room.diceRolls = { [room.players[0]]: 0, [room.players[1]]: 0 }; room.diceTurn = 0; room.diceRound = 0; }
-
-  if (room.players[room.diceTurn % 2] !== userId) return;
-  const roll = Math.floor(Math.random() * 6) + 1 + Math.floor(Math.random() * 6) + 1;
-  room.diceRolls[userId] += roll;
-  room.diceRound++;
-  room.diceTurn++;
-
-  broadcastToUser(userId, { type: 'dice_roll', roomId: room.id, playerId: userId, roll, totals: room.diceRolls, round: room.diceRound });
-  broadcastToUser(oppId, { type: 'dice_roll', roomId: room.id, playerId: userId, roll, totals: room.diceRolls, round: room.diceRound });
-
-  if (room.diceRound >= 6) {
-    const p1 = room.players[0], p2 = room.players[1];
-    endMatch(room, room.diceRolls[p1] > room.diceRolls[p2] ? p1 : room.diceRolls[p2] > room.diceRolls[p1] ? p2 : null);
-  }
-}
-
-function handleMemoryMatch(room, userId, oppId, msg) {
-  if (!room.memCards) {
-    const pairs = 8;
-    const vals = [];
-    for (let i = 1; i <= pairs; i++) { vals.push(i, i); }
-    room.memCards = shuffleArray(vals);
-    room.memRevealed = Array(16).fill(false);
-    room.memFlipped = [];
-    room.memPairs = { [room.players[0]]: 0, [room.players[1]]: 0 };
-    room.memTurn = 0;
-  }
-
-  if (room.players[room.memTurn % 2] !== userId) return;
-  const idx = parseInt(msg.index);
-  if (isNaN(idx) || idx < 0 || idx > 15 || room.memRevealed[idx] || room.memFlipped.length >= 2) return;
-
-  room.memFlipped.push({ idx, val: room.memCards[idx], userId });
-  broadcastToUser(userId, { type: 'mem_flip', roomId: room.id, index: idx, value: room.memCards[idx] });
-  broadcastToUser(oppId, { type: 'mem_flip', roomId: room.id, index: idx, value: room.memCards[idx] });
-
-  if (room.memFlipped.length === 2) {
-    const [a, b] = room.memFlipped;
-    if (a.val === b.val) {
-      room.memRevealed[a.idx] = true;
-      room.memRevealed[b.idx] = true;
-      room.memPairs[userId]++;
-      broadcastToUser(userId, { type: 'mem_match', roomId: room.id, indices: [a.idx, b.idx], playerId: userId });
-      broadcastToUser(oppId, { type: 'mem_match', roomId: room.id, indices: [a.idx, b.idx], playerId: userId });
-    }
-    room.memFlipped = [];
-    room.memTurn++;
-
-    const totalPairs = room.memPairs[room.players[0]] + room.memPairs[room.players[1]];
-    if (totalPairs >= 8) {
-      const p1 = room.players[0], p2 = room.players[1];
-      endMatch(room, room.memPairs[p1] > room.memPairs[p2] ? p1 : room.memPairs[p2] > room.memPairs[p1] ? p2 : null);
+function checkC4Win(board, mark) {
+  for (let r = 0; r < 6; r++) {
+    for (let c = 0; c < 7; c++) {
+      if (board[r][c] !== mark) continue;
+      if (c + 3 < 7 && board[r][c+1] === mark && board[r][c+2] === mark && board[r][c+3] === mark) return true;
+      if (r + 3 < 6 && board[r+1][c] === mark && board[r+2][c] === mark && board[r+3][c] === mark) return true;
+      if (r + 3 < 6 && c + 3 < 7 && board[r+1][c+1] === mark && board[r+2][c+2] === mark && board[r+3][c+3] === mark) return true;
+      if (r + 3 < 6 && c - 3 >= 0 && board[r+1][c-1] === mark && board[r+2][c-2] === mark && board[r+3][c-3] === mark) return true;
     }
   }
+  return false;
 }
 
-function handleMathRush(room, userId, oppId, msg) {
-  if (!room.mathQ) {
-    room.mathQ = generateMathProblem();
-    room.mathScores = { [room.players[0]]: 0, [room.players[1]]: 0 };
-    room.mathRound = 0;
-    room.mathAnswers = {};
-    broadcastToUser(room.players[0], { type: 'math_new', roomId: room.id, question: room.mathQ.text });
-    broadcastToUser(room.players[1], { type: 'math_new', roomId: room.id, question: room.mathQ.text });
+function botC4Move(room) {
+  const valid = [];
+  for (let c = 0; c < 7; c++) if (room.c4Board[0][c] === 0) valid.push(c);
+  if (!valid.length) return undefined;
+
+  for (const c of valid) {
+    let r = 5; while (r >= 0 && room.c4Board[r][c] !== 0) r--;
+    room.c4Board[r][c] = 2;
+    if (checkC4Win(room.c4Board, 2)) { room.c4Board[r][c] = 0; return c; }
+    room.c4Board[r][c] = 0;
   }
-
-  if (msg.answer !== undefined && !room.mathAnswers[userId]) {
-    room.mathAnswers[userId] = { answer: parseInt(msg.answer), time: Date.now() };
+  for (const c of valid) {
+    let r = 5; while (r >= 0 && room.c4Board[r][c] !== 0) r--;
+    room.c4Board[r][c] = 1;
+    if (checkC4Win(room.c4Board, 1)) { room.c4Board[r][c] = 0; return c; }
+    room.c4Board[r][c] = 0;
   }
-
-  if (Object.keys(room.mathAnswers).length === 2) {
-    const p1 = room.players[0], p2 = room.players[1];
-    const a1 = room.mathAnswers[p1], a2 = room.mathAnswers[p2];
-    if (a1 && a1.answer === room.mathQ.answer) room.mathScores[p1]++;
-    if (a2 && a2.answer === room.mathQ.answer) room.mathScores[p2]++;
-    room.mathRound++;
-    room.mathAnswers = {};
-
-    broadcastToUser(userId, { type: 'math_result', roomId: room.id, scores: room.mathScores, answer: room.mathQ.answer, round: room.mathRound });
-    broadcastToUser(oppId, { type: 'math_result', roomId: room.id, scores: room.mathScores, answer: room.mathQ.answer, round: room.mathRound });
-
-    if (room.mathRound >= 10) {
-      endMatch(room, room.mathScores[p1] > room.mathScores[p2] ? p1 : room.mathScores[p2] > room.mathScores[p1] ? p2 : null);
-    } else {
-      room.mathQ = generateMathProblem();
-      broadcastToUser(p1, { type: 'math_new', roomId: room.id, question: room.mathQ.text });
-      broadcastToUser(p2, { type: 'math_new', roomId: room.id, question: room.mathQ.text });
-    }
-  }
+  return valid[Math.floor(Math.random() * valid.length)];
 }
 
-// ===================== STREET RACER =====================
-function handleStreetRacer(room, userId, oppId, msg) {
-  if (!room.racerState) {
-    room.racerState = { [room.players[0]]: { pos: 0, hp: 100 }, [room.players[1]]: { pos: 0, hp: 100 } };
-    room.racerTurn = 0;
-    room.racerRound = 0;
-  }
-  if (room.players[room.racerTurn % 2] !== userId) return;
-
-  const action = msg.action;
-  const state = room.racerState;
-  const oppState = room.racerState[oppId];
-
-  let speed = 0, dmg = 0;
-  switch (action) {
-    case 'boost': speed = Math.floor(Math.random() * 30) + 20; dmg = 0; break;
-    case 'drift': speed = Math.floor(Math.random() * 15) + 10; dmg = 15; break;
-    case 'slipstream': speed = Math.floor(Math.random() * 25) + 15; dmg = 10; break;
-    case 'ram': speed = 10; dmg = 25; break;
-    default: speed = Math.floor(Math.random() * 10) + 5;
-  }
-
-  state[userId].pos += speed;
-  state[userId].hp = Math.max(0, state[userId].hp - Math.floor(Math.random() * 10));
-  oppState.hp = Math.max(0, oppState.hp - dmg);
-  room.racerTurn++;
-  room.racerRound++;
-
-  const finished = state[userId].pos >= 500 || oppState.hp <= 0 || state[userId].hp <= 0 || room.racerRound >= 20;
-  broadcastToUser(userId, { type: 'racer_update', roomId: room.id, playerId: userId, action, speed, dmg, state: JSON.parse(JSON.stringify(state)), finished });
-  broadcastToUser(oppId, { type: 'racer_update', roomId: room.id, playerId: userId, action, speed, dmg, state: JSON.parse(JSON.stringify(state)), finished });
-
-  if (finished) {
-    const p1 = room.players[0], p2 = room.players[1];
-    const s1 = state[p1].pos, s2 = state[p2].pos;
-    const w = s1 > s2 ? p1 : s2 > s1 ? p2 : null;
-    endMatch(room, w);
-  }
-}
-
-// ===================== BOXING =====================
-function handleBoxing(room, userId, oppId, msg) {
-  if (!room.boxState) {
-    room.boxState = { [room.players[0]]: { hp: 100, stamina: 100 }, [room.players[1]]: { hp: 100, stamina: 100 } };
-    room.boxTurn = 0;
-    room.boxRound = 0;
-  }
-  if (room.players[room.boxTurn % 2] !== userId) return;
-
-  const punch = msg.punch;
-  const state = room.boxState;
-  const myState = state[userId];
-  const oppSt = state[oppId];
-
-  let dmg = 0, stamCost = 0;
-  switch (punch) {
-    case 'jab': dmg = Math.floor(Math.random() * 8) + 5; stamCost = 5; break;
-    case 'hook': dmg = Math.floor(Math.random() * 15) + 10; stamCost = 15; break;
-    case 'uppercut': dmg = Math.floor(Math.random() * 20) + 15; stamCost = 25; break;
-    case 'block': dmg = 0; stamCost = 3; myState.stamina = Math.min(100, myState.stamina + 8); break;
-    case 'dodge': dmg = 0; stamCost = 8; break;
-    default: dmg = Math.floor(Math.random() * 5); stamCost = 5;
-  }
-
-  if (punch !== 'block' && punch !== 'dodge' && myState.stamina < stamCost) {
-    dmg = Math.floor(dmg * 0.3);
-    stamCost = 2;
-  }
-  myState.stamina = Math.max(0, myState.stamina - stamCost);
-  oppSt.hp = Math.max(0, oppSt.hp - dmg);
-  myState.stamina = Math.min(100, myState.stamina + 3);
-  room.boxTurn++;
-  room.boxRound++;
-
-  const ko = oppSt.hp <= 0 || room.boxRound >= 12;
-  broadcastToUser(userId, { type: 'box_update', roomId: room.id, playerId: userId, punch, dmg, state: JSON.parse(JSON.stringify(state)), ko });
-  broadcastToUser(oppId, { type: 'box_update', roomId: room.id, playerId: userId, punch, dmg, state: JSON.parse(JSON.stringify(state)), ko });
-
-  if (ko) {
-    const p1 = room.players[0], p2 = room.players[1];
-    const w = state[p1].hp > state[p2].hp ? p1 : state[p2].hp > state[p1].hp ? p2 : null;
-    endMatch(room, w);
-  }
-}
-
-// ===================== STREET FIGHTER =====================
-function handleStreetFighter(room, userId, oppId, msg) {
-  if (!room.sfState) {
-    room.sfState = { [room.players[0]]: { hp: 100, energy: 50, fighter: 'dragon' }, [room.players[1]]: { hp: 100, energy: 50, fighter: 'phoenix' } };
-    room.sfTurn = 0;
-  }
-  if (room.players[room.sfTurn % 2] !== userId) return;
-
-  const move = msg.move;
-  const myState = room.sfState[userId];
-  const oppSt = room.sfState[oppId];
-
-  let dmg = 0, energyGain = 5;
-  switch (move) {
-    case 'punch': dmg = Math.floor(Math.random() * 8) + 4; energyGain = 8; break;
-    case 'kick': dmg = Math.floor(Math.random() * 12) + 8; energyGain = 5; break;
-    case 'fireball': dmg = myState.energy >= 30 ? Math.floor(Math.random() * 20) + 15 : 3; myState.energy -= myState.energy >= 30 ? 30 : 0; energyGain = 0; break;
-    case 'shoryuken': dmg = myState.energy >= 40 ? Math.floor(Math.random() * 25) + 20 : 5; myState.energy -= myState.energy >= 40 ? 40 : 0; energyGain = 0; break;
-    case 'block': dmg = 0; energyGain = 12; break;
-    case 'heal': dmg = 0; myState.hp = Math.min(100, myState.hp + 10); energyGain = -5; break;
-    default: dmg = 4; energyGain = 5;
-  }
-
-  myState.energy = Math.min(100, Math.max(0, myState.energy + energyGain));
-  oppSt.hp = Math.max(0, oppSt.hp - dmg);
-  room.sfTurn++;
-
-  broadcastToUser(userId, { type: 'sf_update', roomId: room.id, playerId: userId, move, dmg, state: JSON.parse(JSON.stringify(room.sfState)) });
-  broadcastToUser(oppId, { type: 'sf_update', roomId: room.id, playerId: userId, move, dmg, state: JSON.parse(JSON.stringify(room.sfState)) });
-
-  const p1 = room.players[0], p2 = room.players[1];
-  if (oppSt.hp <= 0 || room.sfState[p1].hp <= 0 || room.sfState[p2].hp <= 0) {
-    const w = room.sfState[p1].hp > room.sfState[p2].hp ? p1 : room.sfState[p2].hp > room.sfState[p1].hp ? p2 : null;
-    endMatch(room, w);
-  }
-}
-
-// ===================== TETRIS CLASH =====================
-function handleTetrisClash(room, userId, oppId, msg) {
-  if (!room.tetrisState) {
-    room.tetrisState = { [room.players[0]]: { score: 0, lines: 0 }, [room.players[1]]: { score: 0, lines: 0 } };
-    room.tetrisPieces = {};
-    room.tetrisRound = 0;
-  }
-
-  if (msg.type === 'tetris_init') {
-    room.tetrisPieces[userId] = true;
-    broadcastToUser(userId, { type: 'tetris_start', roomId: room.id, pieces: generateTetrisPieces(20) });
-    return;
-  }
-
-  if (msg.linesCleared) {
-    const lines = msg.linesCleared;
-    room.tetrisState[userId].lines += lines;
-    room.tetrisState[userId].score += lines * lines * 100;
-    if (lines >= 2) {
-      room.tetrisState[oppId].penalty = (room.tetrisState[oppId].penalty || 0) + (lines - 1) * 2;
-    }
-  }
-
-  broadcastToUser(oppId, { type: 'tetris_garbage', roomId: room.id, playerId: userId, penalty: msg.linesCleared >= 2 ? (msg.linesCleared - 1) * 2 : 0 });
-
-  if (msg.gameOver) {
-    const p1 = room.players[0], p2 = room.players[1];
-    const w = room.tetrisState[p1].score > room.tetrisState[p2].score ? p1 :
-              room.tetrisState[p2].score > room.tetrisState[p1].score ? p2 : null;
-    endMatch(room, w);
-  }
-}
-
-function generateTetrisPieces(count) {
-  const shapes = ['I','O','T','S','Z','J','L'];
-  const pieces = [];
-  for (let i = 0; i < count; i++) pieces.push(shapes[Math.floor(Math.random() * shapes.length)]);
-  return pieces;
-}
-
-// ===================== BLOCK PUZZLE =====================
-function handleBlockPuzzle(room, userId, oppId, msg) {
-  if (!room.blockState) {
-    room.blockState = { [room.players[0]]: { score: 0, rows: 0 }, [room.players[1]]: { score: 0, rows: 0 } };
-    room.blockTurn = 0;
-  }
-
-  if (msg.type === 'block_init') {
-    broadcastToUser(userId, { type: 'block_start', roomId: room.id });
-    return;
-  }
-
-  if (msg.rowsCleared) {
-    const rows = msg.rowsCleared;
-    const points = rows === 1 ? 100 : rows === 2 ? 300 : rows === 3 ? 500 : 800;
-    room.blockState[userId].score += points;
-    room.blockState[userId].rows += rows;
-
-    broadcastToUser(oppId, { type: 'block_penalty', roomId: room.id, playerId: userId, rows });
-  }
-
-  if (msg.gameOver) {
-    const p1 = room.players[0], p2 = room.players[1];
-    const w = room.blockState[p1].score > room.blockState[p2].score ? p1 :
-              room.blockState[p2].score > room.blockState[p1].score ? p2 : null;
-    endMatch(room, w);
+function generateBotScore(gameId) {
+  const r = Math.random;
+  switch (gameId) {
+    case 'flappy-bird': return Math.floor(r() * 20) + 5;
+    case '2048': return [256, 512, 1024, 1024, 2048][Math.floor(r() * 5)];
+    case 'snake': return Math.floor(r() * 20) + 5;
+    case 'breakout': return Math.floor(r() * 400) + 150;
+    case 'space-invaders': return Math.floor(r() * 2000) + 500;
+    case 'whack-a-mole': return Math.floor(r() * 15) + 5;
+    case 'minesweeper': return Math.floor(r() * 30) + 10;
+    case 'tetris': return Math.floor(r() * 20) + 3;
+    case 'bubble-shooter': return Math.floor(r() * 3000) + 500;
+    case 'doodle-jump': return Math.floor(r() * 5000) + 1000;
+    default: return Math.floor(r() * 100);
   }
 }
 
@@ -1160,25 +871,6 @@ function shuffleArray(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
-}
-
-function shuffleDeck() {
-  const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
-  const deck = [];
-  for (const s of suits) for (let v = 2; v <= 14; v++) deck.push({ suit: s, value: v, name: v === 11 ? 'J' : v === 12 ? 'Q' : v === 13 ? 'K' : v === 14 ? 'A' : v });
-  return shuffleArray(deck);
-}
-
-function generateMathProblem() {
-  const ops = ['+', '-', '×'];
-  const op = ops[Math.floor(Math.random() * ops.length)];
-  let a, b, answer;
-  switch (op) {
-    case '+': a = Math.floor(Math.random() * 50) + 1; b = Math.floor(Math.random() * 50) + 1; answer = a + b; break;
-    case '-': a = Math.floor(Math.random() * 50) + 10; b = Math.floor(Math.random() * a); answer = a - b; break;
-    case '×': a = Math.floor(Math.random() * 12) + 1; b = Math.floor(Math.random() * 12) + 1; answer = a * b; break;
-  }
-  return { text: `${a} ${op} ${b} = ?`, answer };
 }
 
 // ===================== CLEANUP =====================
