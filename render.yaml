@@ -8,3 +8,9 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: GITHUB_DB_PATH
+        value: data/db.json
+      - key: GITHUB_REPO
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
