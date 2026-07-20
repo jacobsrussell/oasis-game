@@ -108,6 +108,17 @@
       "pot": 0,
       "winnerId": "oasis-bot-ai",
       "date": "2026-07-19T16:49:41.882Z"
+    },
+    {
+      "id": "7f718ce0-998b-4ce4-863d-9f1fa2424afe",
+      "gameId": "crossy-road",
+      "players": [
+        "73876379-1a48-4d74-8d3d-47ae2ee4e5db",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "oasis-bot-ai",
+      "date": "2026-07-20T15:18:44.832Z"
     }
   ],
   "transactions": [],
