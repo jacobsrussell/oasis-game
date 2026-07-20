@@ -119,6 +119,50 @@
       "pot": 0,
       "winnerId": null,
       "date": "2026-07-20T17:55:28.418Z"
+    },
+    {
+      "id": "31240b5f-9144-4244-ad8c-e321f3e96a57",
+      "gameId": "flappy-bird",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "oasis-bot-ai",
+      "date": "2026-07-20T17:59:40.627Z"
+    },
+    {
+      "id": "e54e2528-529c-43ed-8ae8-f05c37b5254f",
+      "gameId": "asteroids",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "oasis-bot-ai",
+      "date": "2026-07-20T17:59:57.625Z"
+    },
+    {
+      "id": "0abd6f05-3726-4958-916c-d1d2a634d06f",
+      "gameId": "frogger",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "oasis-bot-ai",
+      "date": "2026-07-20T18:00:08.692Z"
+    },
+    {
+      "id": "f781c5a9-3b50-4513-b5e7-13605dfdfced",
+      "gameId": "snake",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "85a7c76d-f964-45f1-b16b-5d6494253346",
+      "date": "2026-07-20T18:02:48.071Z"
     }
   ],
   "transactions": [],
