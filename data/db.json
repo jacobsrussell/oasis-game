@@ -207,6 +207,28 @@
       "pot": 0,
       "winnerId": null,
       "date": "2026-07-20T18:32:44.772Z"
+    },
+    {
+      "id": "c1e481d9-d7fc-4342-a6de-48c0cb283f43",
+      "gameId": "dig-dug",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": null,
+      "date": "2026-07-20T18:32:44.792Z"
+    },
+    {
+      "id": "0f039ebb-80c4-4fb1-9a13-5b4f7766e37a",
+      "gameId": "space-invaders",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": null,
+      "date": "2026-07-20T18:37:14.835Z"
     }
   ],
   "transactions": [],
