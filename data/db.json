@@ -130,6 +130,17 @@
       "pot": 0,
       "winnerId": "oasis-bot-ai",
       "date": "2026-07-20T17:59:40.627Z"
+    },
+    {
+      "id": "e54e2528-529c-43ed-8ae8-f05c37b5254f",
+      "gameId": "asteroids",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "oasis-bot-ai",
+      "date": "2026-07-20T17:59:57.625Z"
     }
   ],
   "transactions": [],
