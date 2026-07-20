@@ -97,6 +97,17 @@
       "pot": 0,
       "winnerId": "oasis-bot-ai",
       "date": "2026-07-20T17:30:42.536Z"
+    },
+    {
+      "id": "792b30d8-e460-44cb-8c3a-a6e213d16e7a",
+      "gameId": "defender",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": null,
+      "date": "2026-07-20T17:38:27.363Z"
     }
   ],
   "transactions": [],
