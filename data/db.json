@@ -86,6 +86,17 @@
       "pot": 0,
       "winnerId": "oasis-bot-ai",
       "date": "2026-07-20T17:28:13.575Z"
+    },
+    {
+      "id": "e3a29a63-a743-40ff-8d6e-5e2cdb558f1c",
+      "gameId": "bomberman",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "oasis-bot-ai",
+      "date": "2026-07-20T17:30:42.536Z"
     }
   ],
   "transactions": [],
