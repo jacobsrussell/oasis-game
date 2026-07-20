@@ -141,6 +141,17 @@
       "pot": 0,
       "winnerId": "oasis-bot-ai",
       "date": "2026-07-20T17:59:57.625Z"
+    },
+    {
+      "id": "0abd6f05-3726-4958-916c-d1d2a634d06f",
+      "gameId": "frogger",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "oasis-bot-ai",
+      "date": "2026-07-20T18:00:08.692Z"
     }
   ],
   "transactions": [],
