@@ -119,6 +119,17 @@
       "pot": 0,
       "winnerId": null,
       "date": "2026-07-20T17:55:28.418Z"
+    },
+    {
+      "id": "31240b5f-9144-4244-ad8c-e321f3e96a57",
+      "gameId": "flappy-bird",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": "oasis-bot-ai",
+      "date": "2026-07-20T17:59:40.627Z"
     }
   ],
   "transactions": [],
