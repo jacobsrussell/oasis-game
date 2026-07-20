@@ -270,20 +270,20 @@ app.post('/api/withdraw', authMiddleware, (req, res) => {
 
 // ===================== GAMES =====================
 const GAMES = [
-  { id: 'pac-man', name: 'Pac-Man', icon: '🟡', minBet: 10, maxBet: 5000, players: 2, desc: 'Navigate the maze, eat all dots, avoid ghosts! Highest score wins!' },
-  { id: 'frogger', name: 'Frogger', icon: '🐸', minBet: 10, maxBet: 5000, players: 2, desc: 'Cross roads and rivers, dodge traffic! Most crossings wins!' },
-  { id: 'asteroids', name: 'Asteroids', icon: '☄️', minBet: 10, maxBet: 5000, players: 2, desc: 'Warp through space, blast asteroids! Highest score wins!' },
-  { id: 'galaga', name: 'Galaga', icon: '🚀', minBet: 10, maxBet: 5000, players: 2, desc: 'Dodge enemy formations and shoot! Highest alien score wins!' },
-  { id: 'centipede', name: 'Centipede', icon: '🐛', minBet: 10, maxBet: 5000, players: 2, desc: 'Shoot the centipede before it reaches you! Highest score wins!' },
-  { id: 'defender', name: 'Defender', icon: '🛸', minBet: 10, maxBet: 5000, players: 2, desc: 'Protect humans from alien abduction! Highest score wins!' },
-  { id: 'tetris', name: 'Tetris', icon: '📦', minBet: 10, maxBet: 5000, players: 2, desc: 'Stack blocks and clear lines! Most lines cleared wins!' },
-  { id: 'arkanoid', name: 'Arkanoid', icon: '🧱', minBet: 10, maxBet: 5000, players: 2, desc: 'Break every brick with power-ups! Highest score wins!' },
-  { id: 'helicopter', name: 'Helicopter', icon: '🚁', minBet: 10, maxBet: 5000, players: 2, desc: 'Fly through endless caves! Longest distance wins!' },
-  { id: 'geometry-dash', name: 'Geometry Dash', icon: '🔷', minBet: 10, maxBet: 5000, players: 2, desc: 'Jump and fly through obstacles! Highest progress wins!' },
-  { id: 'crossy-road', name: 'Crossy Road', icon: '🐔', minBet: 10, maxBet: 5000, players: 2, desc: 'Hop across roads and rivers! Farthest distance wins!' },
-  { id: 'bomberman', name: 'Bomberman', icon: '💣', minBet: 10, maxBet: 5000, players: 2, desc: 'Place bombs, destroy blocks, trap enemies! Most kills wins!' },
-  { id: 'puyo-puyo', name: 'Puyo Puyo', icon: '🟢', minBet: 10, maxBet: 5000, players: 2, desc: 'Chain-match colored blobs! Biggest chain wins!' },
-  { id: 'tower-defense', name: 'Tower Defense', icon: '🏰', minBet: 10, maxBet: 5000, players: 2, desc: 'Place towers, survive enemy waves! Highest wave wins!' }
+  { id: 'pac-man', name: 'Pac-Man', icon: '🟡', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Navigate the maze, eat all dots, avoid ghosts! Highest score wins!' },
+  { id: 'frogger', name: 'Frogger', icon: '🐸', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Cross roads and rivers, dodge traffic! Most crossings wins!' },
+  { id: 'asteroids', name: 'Asteroids', icon: '☄️', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Warp through space, blast asteroids! Highest score wins!' },
+  { id: 'galaga', name: 'Galaga', icon: '🚀', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Dodge enemy formations and shoot! Highest alien score wins!' },
+  { id: 'centipede', name: 'Centipede', icon: '🐛', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Shoot the centipede before it reaches you! Highest score wins!' },
+  { id: 'defender', name: 'Defender', icon: '🛸', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Protect humans from alien abduction! Highest score wins!' },
+  { id: 'tetris', name: 'Tetris', icon: '📦', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Stack blocks and clear lines! Most lines cleared wins!' },
+  { id: 'arkanoid', name: 'Arkanoid', icon: '🧱', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Break every brick with power-ups! Highest score wins!' },
+  { id: 'donkey-kong', name: 'Donkey Kong', icon: '🦍', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Climb platforms, dodge barrels, rescue the girl! Highest score wins!' },
+  { id: 'space-invaders', name: 'Space Invaders', icon: '👾', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Defend Earth from alien waves! Highest score wins!' },
+  { id: 'snake', name: 'Snake', icon: '🐍', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Eat, grow, don\'t crash! Longest snake wins!' },
+  { id: 'flappy-bird', name: 'Flappy Bird', icon: '🐦', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Flap through pipes! Farthest distance wins!' },
+  { id: 'qbert', name: 'Q*Bert', icon: '🟠', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Hop cubes, change colors, dodge enemies! Most cubes wins!' },
+  { id: 'dig-dug', name: 'Dig Dug', icon: '⛏️', minBet: 0.5, maxBet: 5000, players: 2, desc: 'Dig tunnels, defeat monsters underground! Highest score wins!' }
 ];
 
 app.get('/api/games', authMiddleware, (req, res) => res.json({ games: GAMES }));
@@ -750,12 +750,12 @@ function generateBotScore(gameId) {
     case 'defender': return Math.floor(r() * 15000) + 4000;
     case 'tetris': return Math.floor(r() * 30) + 5;
     case 'arkanoid': return Math.floor(r() * 5000) + 1000;
-    case 'helicopter': return Math.floor(r() * 800) + 200;
-    case 'geometry-dash': return Math.floor(r() * 5000) + 1000;
-    case 'crossy-road': return Math.floor(r() * 40) + 10;
-    case 'bomberman': return Math.floor(r() * 500) + 100;
-    case 'puyo-puyo': return Math.floor(r() * 8000) + 2000;
-    case 'tower-defense': return Math.floor(r() * 30) + 5;
+    case 'donkey-kong': return Math.floor(r() * 8000) + 2000;
+    case 'space-invaders': return Math.floor(r() * 15000) + 3000;
+    case 'snake': return Math.floor(r() * 80) + 20;
+    case 'flappy-bird': return Math.floor(r() * 60) + 10;
+    case 'qbert': return Math.floor(r() * 200) + 50;
+    case 'dig-dug': return Math.floor(r() * 10000) + 2000;
     default: return Math.floor(r() * 100);
   }
 }
