@@ -108,6 +108,17 @@
       "pot": 0,
       "winnerId": null,
       "date": "2026-07-20T17:38:27.363Z"
+    },
+    {
+      "id": "6bca41fd-92bc-4a34-85fd-e9216479e8e8",
+      "gameId": "donkey-kong",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": null,
+      "date": "2026-07-20T17:55:28.418Z"
     }
   ],
   "transactions": [],
