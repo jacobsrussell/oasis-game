@@ -77,48 +77,15 @@
       "date": "2026-07-19T16:11:26.764Z"
     },
     {
-      "id": "9fa52977-c262-4ad5-87db-9833faac96fb",
-      "gameId": "pac-man",
+      "id": "f2255bc5-f64b-46a1-b200-f58e955519bd",
+      "gameId": "helicopter",
       "players": [
-        "73876379-1a48-4d74-8d3d-47ae2ee4e5db",
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
         "oasis-bot-ai"
       ],
       "pot": 0,
       "winnerId": "oasis-bot-ai",
-      "date": "2026-07-19T16:49:26.120Z"
-    },
-    {
-      "id": "8bd5b790-c8f2-4d50-b577-c5c5e2f76184",
-      "gameId": "pac-man",
-      "players": [
-        "73876379-1a48-4d74-8d3d-47ae2ee4e5db",
-        "oasis-bot-ai"
-      ],
-      "pot": 0,
-      "winnerId": "oasis-bot-ai",
-      "date": "2026-07-19T16:49:31.985Z"
-    },
-    {
-      "id": "cc2494f0-38bf-4500-9077-79f1b7c70fd3",
-      "gameId": "frogger",
-      "players": [
-        "73876379-1a48-4d74-8d3d-47ae2ee4e5db",
-        "oasis-bot-ai"
-      ],
-      "pot": 0,
-      "winnerId": "oasis-bot-ai",
-      "date": "2026-07-19T16:49:41.882Z"
-    },
-    {
-      "id": "7f718ce0-998b-4ce4-863d-9f1fa2424afe",
-      "gameId": "crossy-road",
-      "players": [
-        "73876379-1a48-4d74-8d3d-47ae2ee4e5db",
-        "oasis-bot-ai"
-      ],
-      "pot": 0,
-      "winnerId": "oasis-bot-ai",
-      "date": "2026-07-20T15:18:44.832Z"
+      "date": "2026-07-20T17:28:13.575Z"
     }
   ],
   "transactions": [],
