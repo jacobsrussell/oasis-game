@@ -163,6 +163,17 @@
       "pot": 0,
       "winnerId": "85a7c76d-f964-45f1-b16b-5d6494253346",
       "date": "2026-07-20T18:02:48.071Z"
+    },
+    {
+      "id": "e8e9a28e-fad0-4259-a55f-a9a0a90dc8a8",
+      "gameId": "pac-man",
+      "players": [
+        "85a7c76d-f964-45f1-b16b-5d6494253346",
+        "oasis-bot-ai"
+      ],
+      "pot": 0,
+      "winnerId": null,
+      "date": "2026-07-20T18:31:14.729Z"
     }
   ],
   "transactions": [],
