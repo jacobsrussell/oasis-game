@@ -329,6 +329,9 @@
       'helicopter': () => gameHelicopter(gameArea, sendScore),
       'geometry-dash': () => gameGeometryDash(gameArea, sendScore),
       'crossy-road': () => gameCrossyRoad(gameArea, sendScore),
+      'bomberman': () => gameBomberman(gameArea, sendScore),
+      'puyo-puyo': () => gamePuyoPuyo(gameArea, sendScore),
+      'tower-defense': () => gameTowerDefense(gameArea, sendScore),
     };
     if (games[gameId]) gameCleanup = games[gameId]();
   }
@@ -985,6 +988,324 @@
   }
 
 
+
+  // ==================== 12. BOMBERMAN ====================
+  function gameBomberman(area, sendScore) {
+    const W = 320, H = 320, CS = 32;
+    const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.style.cssText = 'display:block;margin:0 auto;border-radius:12px;border:2px solid var(--border);touch-action:none';
+    area.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    const COLS = W / CS, ROWS = H / CS;
+    const grid = [];
+    for (let r = 0; r < ROWS; r++) {
+      grid[r] = [];
+      for (let c = 0; c < COLS; c++) {
+        if (r === 0 && c === 0) grid[r][c] = 0;
+        else if (r < 2 && c < 2) grid[r][c] = 0;
+        else if (r % 2 === 0 && c % 2 === 0) grid[r][c] = 1;
+        else grid[r][c] = Math.random() < 0.7 ? 2 : 0;
+      }
+    }
+    let player = { x: 0, y: 0, bombs: 1, range: 1, maxBombs: 1 };
+    let bombs = [], explosions = [], enemies = [], score = 0, over = false, frame = 0;
+    for (let i = 0; i < 3; i++) {
+      let ex, ey;
+      do { ex = Math.floor(Math.random() * (COLS - 2)) + 1; ey = Math.floor(Math.random() * (ROWS - 2)) + 1; } while (grid[ey][ex] !== 0 || (Math.abs(ex) + Math.abs(ey)) < 4);
+      enemies.push({ x: ex, y: ey, dir: Math.floor(Math.random() * 4), timer: 0, alive: true });
+    }
+    const DIRS = [{ x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }];
+    const canGo = (x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS && grid[y][x] === 0 && !bombs.find(b => b.x === x && b.y === y);
+    const placeBomb = () => {
+      if (bombs.filter(b => b.owner === 'player').length >= player.maxBombs) return;
+      bombs.push({ x: player.x, y: player.y, timer: 120, owner: 'player', range: player.range });
+    };
+    const explode = (bx, by, range, owner) => {
+      explosions.push({ x: bx, y: by, timer: 20 });
+      for (const d of DIRS) {
+        for (let i = 1; i <= range; i++) {
+          const nx = bx + d.x * i, ny = by + d.y * i;
+          if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS || grid[ny][nx] === 1) break;
+          if (grid[ny][nx] === 2) { grid[ny][nx] = 0; score += 10; explosions.push({ x: nx, y: ny, timer: 20 }); break; }
+          explosions.push({ x: nx, y: ny, timer: 20 });
+        }
+      }
+    };
+    const kH = (e) => {
+      if (over) return;
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') { if (canGo(player.x - 1, player.y)) player.x--; }
+      else if (e.code === 'ArrowRight' || e.code === 'KeyD') { if (canGo(player.x + 1, player.y)) player.x++; }
+      else if (e.code === 'ArrowUp' || e.code === 'KeyW') { if (canGo(player.x, player.y - 1)) player.y--; }
+      else if (e.code === 'ArrowDown' || e.code === 'KeyS') { if (canGo(player.x, player.y + 1)) player.y++; }
+      else if (e.code === 'Space') { e.preventDefault(); placeBomb(); }
+    };
+    document.addEventListener('keydown', kH);
+    let touchSX = 0, touchSY = 0;
+    cvs.addEventListener('touchstart', (e) => { touchSX = e.touches[0].clientX; touchSY = e.touches[0].clientY; }, { passive: true });
+    cvs.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - touchSX, dy = e.changedTouches[0].clientY - touchSY;
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) placeBomb();
+      else if (Math.abs(dx) > Math.abs(dy)) { if (canGo(player.x + (dx > 0 ? 1 : -1), player.y)) player.x += dx > 0 ? 1 : -1; }
+      else { if (canGo(player.x, player.y + (dy > 0 ? 1 : -1))) player.y += dy > 0 ? 1 : -1; }
+    }, { passive: true });
+    const loop = setInterval(() => {
+      if (over) return; frame++;
+      for (let i = bombs.length - 1; i >= 0; i--) {
+        bombs[i].timer--;
+        if (bombs[i].timer <= 0) { explode(bombs[i].x, bombs[i].y, bombs[i].range, bombs[i].owner); bombs.splice(i, 1); }
+      }
+      for (let i = explosions.length - 1; i >= 0; i--) { explosions[i].timer--; if (explosions[i].timer <= 0) explosions.splice(i, 1); }
+      for (const e of enemies) {
+        if (!e.alive) continue;
+        e.timer++;
+        if (e.timer >= 15) {
+          e.timer = 0;
+          const d = DIRS[e.dir];
+          const nx = e.x + d.x, ny = e.y + d.y;
+          if (canGo(nx, ny) && !enemies.find(en => en.alive && en.x === nx && en.y === ny)) { e.x = nx; e.y = ny; }
+          else e.dir = Math.floor(Math.random() * 4);
+        }
+        if (e.x === player.x && e.y === player.y) { over = true; clearInterval(loop); sendScore(score); return; }
+      }
+      for (const exp of explosions) {
+        if (exp.x === player.x && exp.y === player.y) { over = true; clearInterval(loop); sendScore(score); return; }
+        for (const e of enemies) { if (e.alive && e.x === exp.x && e.y === exp.y) { e.alive = false; score += 100; } }
+      }
+      if (enemies.every(e => !e.alive)) { score += 500; for (let i = 0; i < 5; i++) { let ex, ey; do { ex = Math.floor(Math.random() * COLS); ey = Math.floor(Math.random() * ROWS); } while (grid[ey][ex] !== 0 || (ex === player.x && ey === player.y)); enemies.push({ x: ex, y: ey, dir: Math.floor(Math.random() * 4), timer: 0, alive: true }); } }
+      ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, W, H);
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (grid[r][c] === 1) { ctx.fillStyle = '#555'; ctx.fillRect(c * CS, r * CS, CS, CS); ctx.fillStyle = '#444'; ctx.fillRect(c * CS + 2, r * CS + 2, CS - 4, CS - 4); }
+        else if (grid[r][c] === 2) { ctx.fillStyle = '#8B4513'; ctx.fillRect(c * CS + 1, r * CS + 1, CS - 2, CS - 2); ctx.fillStyle = '#A0522D'; ctx.fillRect(c * CS + 3, r * CS + 3, CS - 6, CS - 6); }
+      }
+      for (const b of bombs) { const pulse = Math.sin(frame * 0.3) * 3; ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(b.x * CS + CS / 2, b.y * CS + CS / 2, CS / 2 - 4 + pulse, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff4400'; ctx.fillRect(b.x * CS + CS / 2 - 2, b.y * CS + 4, 4, 6); }
+      ctx.fillStyle = '#ff6600';
+      for (const exp of explosions) { ctx.globalAlpha = exp.timer / 20; ctx.fillRect(exp.x * CS, exp.y * CS, CS, CS); }
+      ctx.globalAlpha = 1;
+      for (const e of enemies) { if (e.alive) { ctx.fillStyle = '#ff0000'; ctx.beginPath(); ctx.arc(e.x * CS + CS / 2, e.y * CS + CS / 2, CS / 2 - 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(e.x * CS + 8, e.y * CS + 10, 4, 4); ctx.fillRect(e.x * CS + 18, e.y * CS + 10, 4, 4); } }
+      ctx.fillStyle = '#4488ff'; ctx.fillRect(player.x * CS + 4, player.y * CS + 4, CS - 8, CS - 8);
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(player.x * CS + 10, player.y * CS + 12, 3, 0, Math.PI * 2); ctx.fill(); ctx.beginPath(); ctx.arc(player.x * CS + 20, player.y * CS + 12, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'left'; ctx.fillText('Score: ' + score, 4, 14);
+    }, 1000 / 60);
+    return () => { clearInterval(loop); document.removeEventListener('keydown', kH); };
+  }
+
+  // ==================== 13. PUYO PUYO ====================
+  function gamePuyoPuyo(area, sendScore) {
+    const W = 300, H = 400, CS = 30;
+    const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.style.cssText = 'display:block;margin:0 auto;border-radius:12px;border:2px solid var(--border);touch-action:none';
+    area.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    const COLS = 6, ROWS = 13;
+    const COLORS = ['#ff4444', '#44ff44', '#4444ff', '#ffff00', '#ff44ff'];
+    let board = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+    let score = 0, over = false, frame = 0, combo = 0;
+    let piece = null, dropTimer = 0, dropSpeed = 12;
+    const newPiece = () => {
+      piece = { x: 2, y: 0, c1: COLORS[Math.floor(Math.random() * 5)], c2: COLORS[Math.floor(Math.random() * 5)], rot: 0 };
+      if (board[0][piece.x] || board[0][piece.x + 1]) { over = true; clearInterval(loop); sendScore(score); }
+    };
+    const getPos = (p, i) => {
+      if (i === 0) return { x: p.x, y: p.y };
+      const offsets = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+      return { x: p.x + offsets[p.rot][0], y: p.y + offsets[p.rot][1] };
+    };
+    const canPlace = (p) => {
+      const p0 = getPos(p, 0), p1 = getPos(p, 1);
+      if (p0.x < 0 || p0.x >= COLS || p0.y < 0 || p0.y >= ROWS) return false;
+      if (p1.x < 0 || p1.x >= COLS || p1.y < 0 || p1.y >= ROWS) return false;
+      if (board[p0.y][p0.x] || board[p1.y][p1.x]) return false;
+      return true;
+    };
+    const lockPiece = () => {
+      const p0 = getPos(piece, 0), p1 = getPos(piece, 1);
+      board[p0.y][p0.x] = piece.c1;
+      board[p1.y][p1.x] = piece.c2;
+      chainCheck();
+      newPiece();
+    };
+    const chainCheck = () => {
+      let found = true;
+      let totalChain = 0;
+      while (found) {
+        found = false;
+        const visited = Array.from({ length: ROWS }, () => Array(COLS).fill(false));
+        for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+          if (!board[r][c] || visited[r][c]) continue;
+          const matches = [];
+          const flood = (cr, cc) => {
+            if (cr < 0 || cr >= ROWS || cc < 0 || cc >= COLS) return;
+            if (visited[cr][cc] || board[cr][cc] !== board[r][c]) return;
+            visited[cr][cc] = true;
+            matches.push([cr, cc]);
+            flood(cr - 1, cc); flood(cr + 1, cc); flood(cr, cc - 1); flood(cr, cc + 1);
+          };
+          flood(r, c);
+          if (matches.length >= 4) {
+            found = true; totalChain++;
+            score += matches.length * 10 * totalChain;
+            matches.forEach(([mr, mc]) => { board[mr][mc] = null; });
+          }
+        }
+        if (found) {
+          for (let c = 0; c < COLS; c++) {
+            let empty = -1;
+            for (let r = ROWS - 1; r >= 0; r--) {
+              if (!board[r][c] && empty === -1) empty = r;
+              if (board[r][c] && empty !== -1) { board[empty][c] = board[r][c]; board[r][c] = null; empty--; }
+            }
+          }
+        }
+      }
+      combo = totalChain;
+    };
+    const kH = (e) => {
+      if (over || !piece) return;
+      if (e.code === 'ArrowLeft' && piece.x > 0) { piece.x--; if (!canPlace(piece)) piece.x++; }
+      else if (e.code === 'ArrowRight' && piece.x < COLS - 2) { piece.x++; if (!canPlace(piece)) piece.x--; }
+      else if (e.code === 'ArrowUp') { piece.rot = (piece.rot + 1) % 4; if (!canPlace(piece)) piece.rot = (piece.rot + 3) % 4; }
+      else if (e.code === 'ArrowDown') { dropSpeed = 2; }
+    };
+    document.addEventListener('keydown', kH);
+    let touchSX = 0;
+    cvs.addEventListener('touchstart', (e) => { touchSX = e.touches[0].clientX; }, { passive: true });
+    cvs.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - touchSX;
+      if (Math.abs(dx) < 10) { piece.rot = (piece.rot + 1) % 4; if (!canPlace(piece)) piece.rot = (piece.rot + 3) % 4; }
+      else if (dx > 0 && piece.x < COLS - 2) { piece.x++; if (!canPlace(piece)) piece.x--; }
+      else if (dx < 0 && piece.x > 0) { piece.x--; if (!canPlace(piece)) piece.x++; }
+    }, { passive: true });
+    newPiece();
+    const loop = setInterval(() => {
+      if (over) return; frame++;
+      dropTimer++;
+      if (dropTimer >= dropSpeed) {
+        dropTimer = 0; dropSpeed = 12;
+        piece.y++;
+        if (!canPlace(piece)) { piece.y--; lockPiece(); }
+      }
+      ctx.fillStyle = '#0a0a2e'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#222'; ctx.lineWidth = 1;
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) { ctx.strokeRect(c * CS, r * CS, CS, CS); }
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+        if (board[r][c]) { ctx.fillStyle = board[r][c]; ctx.beginPath(); ctx.arc(c * CS + CS / 2, r * CS + CS / 2, CS / 2 - 2, 0, Math.PI * 2); ctx.fill(); }
+      }
+      if (piece) {
+        const p0 = getPos(piece, 0), p1 = getPos(piece, 1);
+        ctx.fillStyle = piece.c1; ctx.beginPath(); ctx.arc(p0.x * CS + CS / 2, p0.y * CS + CS / 2, CS / 2 - 2, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = piece.c2; ctx.beginPath(); ctx.arc(p1.x * CS + CS / 2, p1.y * CS + CS / 2, CS / 2 - 2, 0, Math.PI * 2); ctx.fill();
+      }
+      if (combo > 0) { ctx.fillStyle = '#ffcc00'; ctx.font = 'bold 18px monospace'; ctx.textAlign = 'center'; ctx.fillText('COMBO x' + combo + '!', W / 2, H / 2); }
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'left'; ctx.fillText('Score: ' + score, 4, 14);
+    }, 1000 / 60);
+    return () => { clearInterval(loop); document.removeEventListener('keydown', kH); };
+  }
+
+  // ==================== 14. TOWER DEFENSE ====================
+  function gameTowerDefense(area, sendScore) {
+    const W = 400, H = 300, CS = 20;
+    const cvs = document.createElement('canvas'); cvs.width = W; cvs.height = H;
+    cvs.style.cssText = 'display:block;margin:0 auto;border-radius:12px;border:2px solid var(--border);touch-action:none';
+    area.appendChild(cvs);
+    const ctx = cvs.getContext('2d');
+    const COLS = W / CS, ROWS = H / CS;
+    const path = [];
+    for (let c = 0; c < COLS; c++) path.push({ x: c, y: Math.floor(ROWS / 2) + Math.floor(Math.sin(c * 0.5) * 3) });
+    let towers = [], enemies = [], bullets = [], gold = 100, lives = 20, score = 0, wave = 0, over = false, frame = 0, waveTimer = 0, enemiesInWave = 0, spawnTimer = 0;
+    const towerTypes = [
+      { name: 'Arrow', cost: 25, range: 3, damage: 10, speed: 30, color: '#4488ff' },
+      { name: 'Cannon', cost: 50, range: 2.5, damage: 30, speed: 60, color: '#ff8800' },
+      { name: 'Ice', cost: 40, range: 2, damage: 5, speed: 20, color: '#00ffff' }
+    ];
+    let selectedTower = 0;
+    const placeTower = (cx, cy) => {
+      const t = towerTypes[selectedTower];
+      if (gold < t.cost) return;
+      if (path.some(p => p.x === cx && p.y === cy)) return;
+      if (towers.some(tw => tw.x === cx && tw.y === cy)) return;
+      if (cx < 0 || cx >= COLS || cy < 0 || cy >= ROWS) return;
+      gold -= t.cost;
+      towers.push({ x: cx, y: cy, ...t, cooldown: 0 });
+    };
+    cvs.addEventListener('click', (e) => {
+      const rect = cvs.getBoundingClientRect();
+      const cx = Math.floor((e.clientX - rect.left) / (rect.width / COLS));
+      const cy = Math.floor((e.clientY - rect.top) / (rect.height / ROWS));
+      placeTower(cx, cy);
+    });
+    const kH = (e) => {
+      if (e.key === '1') selectedTower = 0;
+      else if (e.key === '2') selectedTower = 1;
+      else if (e.key === '3') selectedTower = 2;
+    };
+    document.addEventListener('keydown', kH);
+    const spawnWave = () => {
+      wave++; enemiesInWave = 5 + wave * 3; spawnTimer = 0;
+    };
+    spawnWave();
+    const loop = setInterval(() => {
+      if (over) return; frame++;
+      spawnTimer++;
+      if (enemiesInWave > 0 && spawnTimer >= 30) {
+        spawnTimer = 0; enemiesInWave--;
+        const hp = 30 + wave * 20;
+        enemies.push({ x: path[0].x, y: path[0].y, hp, maxHp: hp, pathIdx: 0, speed: 0.5 + wave * 0.05, color: wave % 3 === 0 ? '#ff0000' : wave % 3 === 1 ? '#ff8800' : '#ffff00' });
+      }
+      for (const e of enemies) {
+        e.pathIdx += e.speed;
+        const idx = Math.floor(e.pathIdx);
+        if (idx >= path.length) { lives--; enemies.splice(enemies.indexOf(e), 1); if (lives <= 0) { over = true; clearInterval(loop); sendScore(score); return; } continue; }
+        const next = Math.min(idx + 1, path.length - 1);
+        const t = e.pathIdx - idx;
+        e.x = path[idx].x + (path[next].x - path[idx].x) * t;
+        e.y = path[idx].y + (path[next].y - path[idx].y) * t;
+      }
+      for (const t of towers) {
+        t.cooldown--;
+        if (t.cooldown <= 0) {
+          let closest = null, closestDist = Infinity;
+          for (const e of enemies) {
+            const d = Math.hypot(e.x - t.x, e.y - t.y);
+            if (d <= t.range && d < closestDist) { closestDist = d; closest = e; }
+          }
+          if (closest) {
+            bullets.push({ x: t.x, y: t.y, tx: closest.x, ty: closest.y, damage: t.damage, speed: 4, color: t.color });
+            t.cooldown = t.speed;
+          }
+        }
+      }
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        const b = bullets[i];
+        const d = Math.hypot(b.tx - b.x, b.ty - b.y);
+        if (d < 0.5) {
+          for (const e of enemies) {
+            if (Math.abs(e.x - b.tx) < 1 && Math.abs(e.y - b.ty) < 1) {
+              e.hp -= b.damage;
+              if (e.hp <= 0) { score += 50; gold += 10 + wave; enemies.splice(enemies.indexOf(e), 1); }
+              break;
+            }
+          }
+          bullets.splice(i, 1); continue;
+        }
+        b.x += (b.tx - b.x) / d * b.speed;
+        b.y += (b.ty - b.y) / d * b.speed;
+      }
+      if (enemies.length === 0 && enemiesInWave <= 0) { waveTimer++; if (waveTimer > 60) { waveTimer = 0; spawnWave(); } }
+      ctx.fillStyle = '#1a3a1a'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#4a3a2a';
+      for (const p of path) ctx.fillRect(p.x * CS, p.y * CS, CS, CS);
+      for (const t of towers) { ctx.fillStyle = t.color; ctx.fillRect(t.x * CS + 2, t.y * CS + 2, CS - 4, CS - 4); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(t.x * CS + CS / 2, t.y * CS + CS / 2, t.range * CS, 0, Math.PI * 2); ctx.stroke(); }
+      for (const e of enemies) { ctx.fillStyle = e.color; ctx.beginPath(); ctx.arc(e.x * CS + CS / 2, e.y * CS + CS / 2, CS / 2 - 2, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = '#ff0000'; ctx.fillRect(e.x * CS + 2, e.y * CS - 4, CS - 4, 3); ctx.fillStyle = '#0f0'; ctx.fillRect(e.x * CS + 2, e.y * CS - 4, (CS - 4) * (e.hp / e.maxHp), 3); }
+      for (const b of bullets) { ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x * CS + CS / 2, b.y * CS + CS / 2, 3, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 11px monospace'; ctx.textAlign = 'left';
+      ctx.fillText('Wave: ' + wave + '  Gold: ' + gold + '  Lives: ' + lives + '  Score: ' + score, 4, 14);
+      ctx.fillText('Towers: [1]Arrow [2]Cannon [3]Ice', 4, H - 6);
+      ctx.fillStyle = towerTypes[selectedTower].color; ctx.fillRect(W - 30, 4, 22, 12);
+    }, 1000 / 60);
+    return () => { clearInterval(loop); document.removeEventListener('keydown', kH); };
+  }
+
+
   // ===================== WALLET =====================
   function setupWallet() {
     $('#btn-deposit').addEventListener('click', () => $('#section-wallet').querySelector('.deposit-form')?.scrollIntoView({ behavior: 'smooth' }));
@@ -1190,7 +1511,7 @@
     if (d.error) return;
     const list = $('#matches-list');
     if (!list) return;
-    const gameNames = { 'pac-man': '🟡 Pac-Man', 'frogger': '🐸 Frogger', 'asteroids': '☄️ Asteroids', 'galaga': '🚀 Galaga', 'centipede': '🐛 Centipede', 'defender': '🛸 Defender', 'tetris': '📦 Tetris', 'arkanoid': '🧱 Arkanoid', 'helicopter': '🚁 Helicopter', 'geometry-dash': '🔷 Geometry Dash', 'crossy-road': '🐔 Crossy Road' };
+    const gameNames = { 'pac-man': '🟡 Pac-Man', 'frogger': '🐸 Frogger', 'asteroids': '☄️ Asteroids', 'galaga': '🚀 Galaga', 'centipede': '🐛 Centipede', 'defender': '🛸 Defender', 'tetris': '📦 Tetris', 'arkanoid': '🧱 Arkanoid', 'helicopter': '🚁 Helicopter', 'geometry-dash': '🔷 Geometry Dash', 'crossy-road': '🐔 Crossy Road', 'bomberman': '💣 Bomberman', 'puyo-puyo': '🟢 Puyo Puyo', 'tower-defense': '🏰 Tower Defense' };
     list.innerHTML = d.matches.length ? d.matches.map(m => {
       const won = m.winnerId === user.id;
       const draw = !m.winnerId;
@@ -1214,7 +1535,14 @@
     if (d.error) return;
     const el = $('#leaderboard');
     if (!el) return;
-    el.innerHTML = d.leaderboard.map((p, i) => `
+    let html = '<div class="lb-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem">';
+    html += '<button class="btn-secondary lb-tab active" onclick="window.oasisLBTab(\'all\',this)" style="padding:8px 14px;font-size:12px">🏆 Overall</button>';
+    const gameList = ['pac-man','frogger','asteroids','galaga','centipede','defender','tetris','arkanoid','helicopter','geometry-dash','crossy-road','bomberman','puyo-puyo','tower-defense'];
+    const gameIcons = {'pac-man':'🟡','frogger':'🐸','asteroids':'☄️','galaga':'🚀','centipede':'🐛','defender':'🛸','tetris':'📦','arkanoid':'🧱','helicopter':'🚁','geometry-dash':'🔷','crossy-road':'🐔','bomberman':'💣','puyo-puyo':'🟢','tower-defense':'🏰'};
+    gameList.forEach(g => { html += `<button class="btn-secondary lb-tab" onclick="window.oasisLBTab('${g}',this)" style="padding:8px 14px;font-size:12px">${gameIcons[g]||'🎮'} ${g}</button>`; });
+    html += '</div>';
+    html += '<div id="lb-content">';
+    html += d.leaderboard.map((p, i) => `
       <div class="lb-item ${i < 3 ? 'top3' : ''}">
         <div class="lb-rank ${i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''}">${i + 1}</div>
         <div class="lb-name">${p.username}</div>
@@ -1222,7 +1550,39 @@
         <div class="lb-earnings">R${p.earnings.toLocaleString()}</div>
       </div>
     `).join('');
+    html += '</div>';
+    el.innerHTML = html;
+    window._lbData = d;
   }
+
+  window.oasisLBTab = async (gameId, btn) => {
+    $$('.lb-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const content = $('#lb-content');
+    if (gameId === 'all') {
+      const d = window._lbData || await api('/api/leaderboard');
+      if (d.error) return;
+      content.innerHTML = d.leaderboard.map((p, i) => `
+        <div class="lb-item ${i < 3 ? 'top3' : ''}">
+          <div class="lb-rank ${i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''}">${i + 1}</div>
+          <div class="lb-name">${p.username}</div>
+          <div class="lb-wins">${p.wins} wins</div>
+          <div class="lb-earnings">R${p.earnings.toLocaleString()}</div>
+        </div>
+      `).join('') || '<p style="color:var(--text-muted)">No players yet</p>';
+    } else {
+      const d = await api('/api/leaderboard/' + gameId);
+      if (d.error) return;
+      content.innerHTML = d.leaderboard.map((p, i) => `
+        <div class="lb-item ${i < 3 ? 'top3' : ''}">
+          <div class="lb-rank ${i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : ''}">${i + 1}</div>
+          <div class="lb-name">${p.username}</div>
+          <div class="lb-wins">${p.wins} wins</div>
+          <div class="lb-earnings">R${p.earnings.toLocaleString()}</div>
+        </div>
+      `).join('') || '<p style="color:var(--text-muted)">No matches played for this game yet</p>';
+    }
+  };
 
   // ===================== PROFILE =====================
   function loadProfile() {

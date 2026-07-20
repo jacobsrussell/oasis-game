@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Oasis Game Centre</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Arial,sans-serif;background:#071b22;color:#effff8}
+    .app{display:flex;min-height:100vh}
+    .side{width:230px;padding:24px 16px;background:#06151a;border-right:1px solid #24535a}
+    .logo{font-size:22px;font-weight:bold;margin-bottom:35px}
+    .logo b{color:#f4c95d}
+    nav button{display:block;width:100%;padding:13px;margin:6px 0;border:0;border-radius:10px;text-align:left;background:transparent;color:#9cc3bc;cursor:pointer;font-size:15px}
+    nav button:hover,nav button.active{background:#123940;color:#fff}
+    nav button .nav-icon{display:none}
+    main{flex:1;padding:30px;max-width:1300px;margin:auto;width:100%}
+    .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
+    .credit{background:#0d2a31;padding:12px 16px;border-radius:12px;color:#f4c95d;font-weight:bold}
+    .page{display:none}
+    .page.active{display:block}
+    .eyebrow{color:#43d39e;text-transform:uppercase;letter-spacing:1.5px;font-size:12px;font-weight:bold}
+    h1{font-size:42px;margin:8px 0 12px}
+    .muted{color:#9cc3bc;line-height:1.6}
+    .hero{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:35px;border-radius:22px;border:1px solid #24535a;background:linear-gradient(135deg,#19534d,#0a282d);margin-bottom:24px}
+    .hero-art{font-size:90px}
+    .btn{padding:13px 18px;border:0;border-radius:10px;font-weight:bold;cursor:pointer}
+    .primary{background:#f4c95d;color:#13231f}
+    .secondary{background:#123940;color:#fff;border:1px solid #24535a}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    .card{background:#0d2a31;border:1px solid #24535a;border-radius:16px;padding:20px}
+    .icon{font-size:40px}
+    .stat{font-size:30px;color:#f4c95d;font-weight:bold}
+    .game{min-height:190px;display:flex;flex-direction:column;justify-content:space-between}
+    .row{display:flex;justify-content:space-between;padding:15px 0;border-bottom:1px solid #24535a}
+    .row:last-child{border:0}
+    .modal{display:none;position:fixed;inset:0;background:#000b;align-items:center;justify-content:center;padding:20px}
+    .modal.show{display:flex}
+    .box{max-width:450px;width:100%;text-align:center;background:#0d2a31;border:1px solid #24535a;border-radius:20px;padding:30px}
+    .match{font-size:65px;margin:20px}
+    .progress{height:9px;background:#173b40;border-radius:20px;overflow:hidden;margin:20px 0}
+    .bar{height:100%;width:0;background:#43d39e;transition:width 2s}
+    .leaderboard-item{display:flex;align-items:center;gap:12px;padding:12px 16px;background:#0d2a31;border:1px solid #24535a;border-radius:12px;margin-bottom:8px}
+    .lb-rank{font-size:18px;font-weight:bold;color:#f4c95d;width:30px}
+    .lb-name{flex:1}
+    .lb-pts{color:#43d39e;font-weight:bold}
+    .wallet-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
+
+    @media(max-width:750px){
+      .side{width:70px;padding:15px 8px}
+      .logo{font-size:0}
+      .logo::before{content:"🌴";font-size:25px;display:block;text-align:center}
+      nav button{font-size:0;padding:13px 8px}
+      nav button .nav-icon{display:inline;font-size:20px}
+      main{padding:20px 15px}
+      h1{font-size:32px}
+      .hero{padding:24px}
+      .hero-art{font-size:60px}
+      .grid{grid-template-columns:1fr}
+      .wallet-grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <div class="logo">OASIS <b>GAME CENTRE</b></div>
+      <nav>
+        <button class="active" onclick="page('home',this)"><span class="nav-icon">⌂</span> Home</button>
+        <button onclick="page('games',this)"><span class="nav-icon">🎮</span> Games</button>
+        <button onclick="page('leaderboard',this)"><span class="nav-icon">🏆</span> Leaderboard</button>
+        <button onclick="page('wallet',this)"><span class="nav-icon">💰</span> Wallet</button>
+        <button onclick="page('profile',this)"><span class="nav-icon">👤</span> Profile</button>
+      </nav>
+    </aside>
+
+    <main>
+      <!-- HOME -->
+      <div class="page active" id="page-home">
+        <div class="top">
+          <div>
+            <div class="eyebrow">Welcome back</div>
+            <h1>Oasis Game Centre</h1>
+          </div>
+          <div class="credit">Balance: R0.00</div>
+        </div>
+        <div class="hero">
+          <div>
+            <div class="eyebrow">Ready to play?</div>
+            <h1>Challenge Players</h1>
+            <p class="muted">Real money. Real competition. Win big.</p>
+            <button class="btn primary" onclick="page('games',document.querySelector('nav button:nth-child(2)'))">Play Now</button>
+          </div>
+          <div class="hero-art">🌴</div>
+        </div>
+        <div class="grid">
+          <div class="card"><div class="icon">🎮</div><div class="stat">11</div><div class="muted">Arcade Games</div></div>
+          <div class="card"><div class="icon">🏆</div><div class="stat">0</div><div class="muted">Matches Won</div></div>
+          <div class="card"><div class="icon">💰</div><div class="stat">R0</div><div class="muted">Total Winnings</div></div>
+        </div>
+      </div>
+
+      <!-- GAMES -->
+      <div class="page" id="page-games">
+        <div class="top">
+          <div>
+            <div class="eyebrow">Arcade Arena</div>
+            <h1>Choose Your Game</h1>
+          </div>
+        </div>
+        <div class="grid" id="games-grid"></div>
+      </div>
+
+      <!-- LEADERBOARD -->
+      <div class="page" id="page-leaderboard">
+        <div class="top">
+          <div>
+            <div class="eyebrow">Top Players</div>
+            <h1>Leaderboard</h1>
+          </div>
+        </div>
+        <div id="leaderboard-list"></div>
+      </div>
+
+      <!-- WALLET -->
+      <div class="page" id="page-wallet">
+        <div class="top">
+          <div>
+            <div class="eyebrow">Your Money</div>
+            <h1>Wallet</h1>
+          </div>
+        </div>
+        <div class="wallet-grid">
+          <div class="card"><div class="icon">💰</div><div class="stat">R0.00</div><div class="muted">Balance</div></div>
+          <div class="card"><div class="icon">📤</div><div class="stat">R0</div><div class="muted">Total Withdrawn</div></div>
+        </div>
+        <div class="card">
+          <h2>Deposit</h2>
+          <p class="muted">Bank: Oasis Gaming Platform<br>Account: 1670 914 22<br>Branch: 470010</p>
+          <input type="number" placeholder="Amount (R)" style="width:100%;padding:12px;margin:12px 0;border:1px solid #24535a;border-radius:10px;background:#06151a;color:#effff8;font-size:15px">
+          <button class="btn primary" style="width:100%">Submit Deposit</button>
+        </div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="page" id="page-profile">
+        <div class="top">
+          <div>
+            <div class="eyebrow">Your Account</div>
+            <h1>Profile</h1>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row"><span>Username</span><span>—</span></div>
+          <div class="row"><span>Email</span><span>—</span></div>
+          <div class="row"><span>Wins</span><span>0</span></div>
+          <div class="row"><span>Losses</span><span>0</span></div>
+          <div class="row"><span>Win Rate</span><span>0%</span></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function page(name, btn) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+      document.getElementById('page-' + name)?.classList.add('active');
+      btn?.classList.add('active');
+    }
+  </script>
+</body>
+</html>

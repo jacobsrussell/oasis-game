@@ -280,7 +280,10 @@ const GAMES = [
   { id: 'arkanoid', name: 'Arkanoid', icon: '🧱', minBet: 10, maxBet: 5000, players: 2, desc: 'Break every brick with power-ups! Highest score wins!' },
   { id: 'helicopter', name: 'Helicopter', icon: '🚁', minBet: 10, maxBet: 5000, players: 2, desc: 'Fly through endless caves! Longest distance wins!' },
   { id: 'geometry-dash', name: 'Geometry Dash', icon: '🔷', minBet: 10, maxBet: 5000, players: 2, desc: 'Jump and fly through obstacles! Highest progress wins!' },
-  { id: 'crossy-road', name: 'Crossy Road', icon: '🐔', minBet: 10, maxBet: 5000, players: 2, desc: 'Hop across roads and rivers! Farthest distance wins!' }
+  { id: 'crossy-road', name: 'Crossy Road', icon: '🐔', minBet: 10, maxBet: 5000, players: 2, desc: 'Hop across roads and rivers! Farthest distance wins!' },
+  { id: 'bomberman', name: 'Bomberman', icon: '💣', minBet: 10, maxBet: 5000, players: 2, desc: 'Place bombs, destroy blocks, trap enemies! Most kills wins!' },
+  { id: 'puyo-puyo', name: 'Puyo Puyo', icon: '🟢', minBet: 10, maxBet: 5000, players: 2, desc: 'Chain-match colored blobs! Biggest chain wins!' },
+  { id: 'tower-defense', name: 'Tower Defense', icon: '🏰', minBet: 10, maxBet: 5000, players: 2, desc: 'Place towers, survive enemy waves! Highest wave wins!' }
 ];
 
 app.get('/api/games', authMiddleware, (req, res) => res.json({ games: GAMES }));
@@ -528,6 +531,27 @@ app.get('/api/leaderboard', authMiddleware, (req, res) => {
   res.json({ leaderboard: top });
 });
 
+app.get('/api/leaderboard/:gameId', authMiddleware, (req, res) => {
+  const { gameId } = req.params;
+  const scores = {};
+  db.matches
+    .filter(m => m.gameId === gameId && m.winnerId)
+    .forEach(m => {
+      const wid = m.winnerId;
+      if (!scores[wid]) {
+        const u = findUser({ id: wid });
+        scores[wid] = { userId: wid, username: u ? u.username : 'Unknown', wins: 0, earnings: 0 };
+      }
+      scores[wid].wins++;
+      scores[wid].earnings += m.pot;
+    });
+  const top = Object.values(scores)
+    .sort((a, b) => b.wins - a.wins)
+    .slice(0, 20)
+    .map((s, i) => ({ rank: i + 1, ...s }));
+  res.json({ gameId, leaderboard: top });
+});
+
 // ===================== MATCH HISTORY =====================
 app.get('/api/matches', authMiddleware, (req, res) => {
   const matches = db.matches
@@ -729,6 +753,9 @@ function generateBotScore(gameId) {
     case 'helicopter': return Math.floor(r() * 800) + 200;
     case 'geometry-dash': return Math.floor(r() * 5000) + 1000;
     case 'crossy-road': return Math.floor(r() * 40) + 10;
+    case 'bomberman': return Math.floor(r() * 500) + 100;
+    case 'puyo-puyo': return Math.floor(r() * 8000) + 2000;
+    case 'tower-defense': return Math.floor(r() * 30) + 5;
     default: return Math.floor(r() * 100);
   }
 }
